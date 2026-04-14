@@ -9,11 +9,38 @@ require("dotenv").config();
 
 const app = express();
 
-app.use(cors());
+const allowedOrigins = new Set([
+  (process.env.FRONTEND_URL || '').trim(),
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+].filter(Boolean));
+
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin) return callback(null, true);
+
+    try {
+      const hostname = new URL(origin).hostname;
+      if (allowedOrigins.has(origin) || hostname === 'localhost' || hostname === '127.0.0.1' || hostname.endsWith('.vercel.app')) {
+        return callback(null, true);
+      }
+    } catch (error) {
+      console.error('CORS ORIGIN PARSE ERROR:', error);
+    }
+
+    return callback(new Error(`Origin not allowed by CORS: ${origin}`));
+  },
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
 app.use(express.json());
 
 const PORT = process.env.PORT || 5000;
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+
+if (!process.env.JWT_SECRET) {
+  console.warn("JWT_SECRET is missing. Auth routes will fail until it is set.");
+}
 
 const HINT_KEYS = [
   "neonMagnet",
@@ -283,8 +310,68 @@ async function incrementLeaderboardGamesPlayed(userId, mode = 'player1') {
   );
 }
 
+async function initializeNewUserData(userId) {
+  const initializationErrors = [];
+
+  for (const hintKey of HINT_KEYS) {
+    try {
+      await dbQuery(
+        `INSERT INTO user_hints (user_id, hint_key, quantity)
+         VALUES (?, ?, 0)
+         ON DUPLICATE KEY UPDATE quantity = quantity`,
+        [userId, hintKey]
+      );
+    } catch (error) {
+      console.error(`USER_HINTS INIT ERROR (${hintKey}):`, error);
+      initializationErrors.push(`hint:${hintKey}`);
+    }
+  }
+
+  try {
+    await upsertLeaderboardEntry(userId);
+  } catch (error) {
+    console.error('LEADERBOARD INIT ERROR:', error);
+    initializationErrors.push('leaderboard');
+  }
+
+  return initializationErrors;
+}
+
+async function buildRegisterResponse(userId, extras = {}) {
+  const insertedUser = await getUserById(userId);
+
+  if (insertedUser) {
+    return buildAuthResponse(insertedUser, extras);
+  }
+
+  const fallbackRows = await dbQuery(
+    `SELECT id, gmail, username, coins, score, profile_picture, full_name, premium, premium_tier, premium_expiry
+     FROM users WHERE id = ? LIMIT 1`,
+    [userId]
+  );
+
+  if (!fallbackRows.length) {
+    throw new Error('User account was created but could not be loaded');
+  }
+
+  return buildAuthResponse({
+    ...fallbackRows[0],
+    hints: buildDefaultHints(),
+  }, extras);
+}
+
 app.get("/", (req, res) => {
   res.send("Backend is running");
+});
+
+app.get("/healthz", async (req, res) => {
+  try {
+    await dbQuery("SELECT 1 AS ok");
+    res.json({ ok: true, message: "Backend and database are reachable" });
+  } catch (error) {
+    console.error("HEALTH CHECK ERROR:", error);
+    res.status(500).json({ ok: false, message: error.message || "Database is not reachable" });
+  }
 });
 
 app.get("/me", verifyToken, async (req, res) => {
@@ -406,23 +493,19 @@ app.post("/google-complete-profile", async (req, res) => {
       [gmail, cleanUsername, hashedPassword, decoded.profilePicture || "", decoded.fullName || ""]
     );
 
-    for (const hintKey of HINT_KEYS) {
-      await dbQuery(
-        "INSERT INTO user_hints (user_id, hint_key, quantity) VALUES (?, ?, 0)",
-        [insertResult.insertId, hintKey]
-      );
-    }
+    const initializationErrors = await initializeNewUserData(insertResult.insertId);
 
-    await upsertLeaderboardEntry(insertResult.insertId);
+    const authResponse = await buildRegisterResponse(insertResult.insertId, {
+      profilePicture: decoded.profilePicture || "",
+      fullName: decoded.fullName || "",
+    });
 
-    const insertedUser = await getUserById(insertResult.insertId);
-
-    return res.status(201).json(
-      buildAuthResponse(insertedUser, {
-        profilePicture: decoded.profilePicture || "",
-        fullName: decoded.fullName || "",
-      })
-    );
+    return res.status(201).json({
+      ...authResponse,
+      warning: initializationErrors.length
+        ? `Account created. Some profile extras were retried later: ${initializationErrors.join(", ")}`
+        : undefined,
+    });
   } catch (error) {
     console.error("GOOGLE COMPLETE PROFILE ERROR:", error);
 
@@ -479,25 +562,15 @@ app.post("/register", async (req, res) => {
       [gmail, username, hashedPassword]
     );
 
-    try {
-      for (const hintKey of HINT_KEYS) {
-        await dbQuery(
-          "INSERT INTO user_hints (user_id, hint_key, quantity) VALUES (?, ?, 0)",
-          [insertResult.insertId, hintKey]
-        );
-      }
-    } catch (hintError) {
-      console.error("USER_HINTS INIT ERROR:", hintError);
-    }
+    const initializationErrors = await initializeNewUserData(insertResult.insertId);
 
-    try {
-      await upsertLeaderboardEntry(insertResult.insertId);
-    } catch (leaderboardError) {
-      console.error("LEADERBOARD INIT ERROR:", leaderboardError);
-    }
-
-    const insertedUser = await getUserById(insertResult.insertId);
-    return res.status(201).json(buildAuthResponse(insertedUser));
+    const authResponse = await buildRegisterResponse(insertResult.insertId);
+    return res.status(201).json({
+      ...authResponse,
+      warning: initializationErrors.length
+        ? `Account created. Some profile extras were retried later: ${initializationErrors.join(", ")}`
+        : undefined,
+    });
   } catch (error) {
     console.error("REGISTER ERROR:", error);
     return res.status(500).json({ message: error.message || "Registration failed" });
