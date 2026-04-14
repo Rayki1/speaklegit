@@ -13,7 +13,11 @@ const allowedOrigins = [
   process.env.FRONTEND_URL,
   "http://localhost:5173",
   "http://127.0.0.1:5173",
+  "https://speaklegit.vercel.app",
+  "https://speaklegit-git-main-dolorricky7-4367s-projects.vercel.app"
 ].filter(Boolean);
+
+const cors = require("cors");
 
 app.use(cors({
   origin(origin, callback) {
