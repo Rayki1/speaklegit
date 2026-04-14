@@ -2,6 +2,7 @@ import { useContext, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import { UserContext } from "../context/UserContext";
+import { apiUrl } from "../utils/api";
 
 const FALLING_ITEMS = [
   { label: "ELOQUENCE", left: "3%", duration: "14s", delay: "-7s", size: "0.65rem", color: "rgba(255,210,245,0.50)", isText: true },
@@ -59,7 +60,7 @@ function Login() {
 
     if (token) {
       try {
-        const profileRes = await fetch("http://localhost:5000/me", {
+        const profileRes = await fetch(apiUrl("/me"), {
           headers: { Authorization: `Bearer ${token}` },
         });
         const profileData = await profileRes.json();
@@ -119,7 +120,7 @@ function Login() {
     setLoading(true);
 
     try {
-      const res = await fetch("http://localhost:5000/login", {
+      const res = await fetch(apiUrl("/login"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username: cleanUsername, password: cleanPassword }),

@@ -2,6 +2,7 @@ import { useContext, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import { UserContext } from "../context/UserContext";
+import { apiUrl } from "../utils/api";
 
 function Register() {
   const navigate = useNavigate();
@@ -35,7 +36,7 @@ function Register() {
     setLoading(true);
 
     try {
-      const res = await fetch("http://localhost:5000/register", {
+      const res = await fetch(apiUrl("/register"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

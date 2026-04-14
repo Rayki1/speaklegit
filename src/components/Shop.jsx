@@ -2,6 +2,7 @@ import { useContext, useRef, useState } from "react";
 import Button from "../components/Button";
 import Card from "../components/Card";
 import { UserContext } from "../context/UserContext";
+import { apiUrl } from "../utils/api";
 
 const hintProducts = [
   {
