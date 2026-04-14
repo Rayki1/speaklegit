@@ -1,0 +1,8 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^node -e \"const fs = require\\('fs'\\); const path = 'c:\\\\\\\\\\\\\\\\Users\\\\\\\\\\\\\\\\James Paul Zapanta\\\\\\\\\\\\\\\\Downloads\\\\\\\\\\\\\\\\speak-fixed\\\\\\\\\\\\\\\\src\\\\\\\\\\\\\\\\games\\\\\\\\\\\\\\\\MovieLines\\.jsx'; const content = fs\\.readFileSync\\(path, 'utf8'\\); const lines = content\\.split\\('\\\\\\\\n'\\); const truncated = lines\\.slice\\(0, 594\\)\\.join\\('\\\\\\\\n'\\); fs\\.writeFileSync\\(path, truncated, 'utf8'\\); console\\.log\\('File truncated to 594 lines'\\);\" 2>&1$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}

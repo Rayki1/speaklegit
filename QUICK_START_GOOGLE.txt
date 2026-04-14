@@ -1,0 +1,15 @@
+GOOGLE LOGIN IS ALREADY CONFIGURED WITH YOUR CLIENT ID.
+
+What to run:
+1) Frontend/root terminal:
+   npm run dev
+
+2) Backend terminal:
+   cd backend
+   node server.js
+
+Make sure Google Cloud OAuth client includes:
+- Authorized JavaScript origin: http://localhost:5173
+- Authorized redirect URI: http://localhost:5173
+
+If your frontend runs on a different port, update the OAuth client to match that port.
