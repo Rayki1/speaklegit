@@ -1,10 +1,10 @@
 SPEAKS GOOGLE LOGIN SETUP
 
 1. FRONTEND .env (inside the main project folder)
-   VITE_GOOGLE_CLIENT_ID=your_google_client_id_here
+   VITE_GOOGLE_CLIENT_ID=VITE_GOOGLE_CLIENT_ID=396029785270-sggplv0ucu9mhteqa9446ck1q5ls34st.apps.googleusercontent.com
 
 2. BACKEND .env (inside backend folder)
-   GOOGLE_CLIENT_ID=your_google_client_id_here
+   GOOGLE_CLIENT_ID=VITE_GOOGLE_CLIENT_ID=396029785270-sggplv0ucu9mhteqa9446ck1q5ls34st.apps.googleusercontent.com
    JWT_SECRET=your_secret_here
 
 3. GOOGLE CLOUD
