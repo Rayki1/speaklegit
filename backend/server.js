@@ -453,12 +453,20 @@ app.post("/register", async (req, res) => {
       return res.status(400).json({ message: "Password must be at least 6 characters" });
     }
 
-    const existingUsername = await dbQuery("SELECT id FROM users WHERE username = ? LIMIT 1", [username]);
+    const existingUsername = await dbQuery(
+      "SELECT id FROM users WHERE username = ? LIMIT 1",
+      [username]
+    );
+
     if (existingUsername.length > 0) {
       return res.status(400).json({ message: "Username already exists" });
     }
 
-    const existingGmail = await dbQuery("SELECT id FROM users WHERE gmail = ? LIMIT 1", [gmail]);
+    const existingGmail = await dbQuery(
+      "SELECT id FROM users WHERE gmail = ? LIMIT 1",
+      [gmail]
+    );
+
     if (existingGmail.length > 0) {
       return res.status(400).json({ message: "Gmail already exists" });
     }
@@ -471,14 +479,22 @@ app.post("/register", async (req, res) => {
       [gmail, username, hashedPassword]
     );
 
-    for (const hintKey of HINT_KEYS) {
-      await dbQuery(
-        "INSERT INTO user_hints (user_id, hint_key, quantity) VALUES (?, ?, 0)",
-        [insertResult.insertId, hintKey]
-      );
+    try {
+      for (const hintKey of HINT_KEYS) {
+        await dbQuery(
+          "INSERT INTO user_hints (user_id, hint_key, quantity) VALUES (?, ?, 0)",
+          [insertResult.insertId, hintKey]
+        );
+      }
+    } catch (hintError) {
+      console.error("USER_HINTS INIT ERROR:", hintError);
     }
 
-    await upsertLeaderboardEntry(insertResult.insertId);
+    try {
+      await upsertLeaderboardEntry(insertResult.insertId);
+    } catch (leaderboardError) {
+      console.error("LEADERBOARD INIT ERROR:", leaderboardError);
+    }
 
     const insertedUser = await getUserById(insertResult.insertId);
     return res.status(201).json(buildAuthResponse(insertedUser));
