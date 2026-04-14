@@ -2,9 +2,9 @@ import { lazy, Suspense } from "react";
 import { createBrowserRouter } from "react-router-dom";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
+import Register from "./pages/Register";
 import About from "./pages/About";
 import Contact from "./pages/Contact";
-import Register from "./pages/Register";
 
 const routeLoaderPaths = new Set(["/difficulty", "/oneplayer", "/twoplayer"]);
 

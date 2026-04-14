@@ -9,25 +9,7 @@ require("dotenv").config();
 
 const app = express();
 
-const allowedOrigins = [
-  process.env.FRONTEND_URL,
-  "http://localhost:5173",
-  "http://127.0.0.1:5173",
-  "https://speaklegit.vercel.app",
-  "https://speaklegit-git-main-dolorricky7-4367s-projects.vercel.app"
-].filter(Boolean);
-
-const cors = require("cors");
-
-app.use(cors({
-  origin(origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-    return callback(new Error("Not allowed by CORS"));
-  },
-  credentials: true,
-}));
+app.use(cors());
 app.use(express.json());
 
 const PORT = process.env.PORT || 5000;
@@ -305,10 +287,6 @@ app.get("/", (req, res) => {
   res.send("Backend is running");
 });
 
-app.get("/health", (req, res) => {
-  res.json({ status: "ok" });
-});
-
 app.get("/me", verifyToken, async (req, res) => {
   try {
     const user = await getUserById(req.user.id);
@@ -321,97 +299,6 @@ app.get("/me", verifyToken, async (req, res) => {
   } catch (error) {
     console.error("PROFILE FETCH ERROR:", error);
     return res.status(500).json({ message: "Failed to fetch user" });
-  }
-});
-
-
-app.post("/register", async (req, res) => {
-  try {
-    const cleanUsername = String(req.body?.username || "").trim();
-    const cleanGmail = String(req.body?.gmail || "").trim().toLowerCase();
-    const password = String(req.body?.password || "");
-
-    if (!cleanUsername || !cleanGmail || !password.trim()) {
-      return res.status(400).json({ message: "Please fill in all fields." });
-    }
-
-    if (cleanUsername.length < 3) {
-      return res.status(400).json({ message: "Username must be at least 3 characters." });
-    }
-
-    if (password.length < 6) {
-      return res.status(400).json({ message: "Password must be at least 6 characters." });
-    }
-
-    const existingRows = await dbQuery(
-      "SELECT id, username, gmail FROM users WHERE username = ? OR gmail = ? LIMIT 1",
-      [cleanUsername, cleanGmail]
-    );
-
-    if (existingRows.length > 0) {
-      const existing = existingRows[0];
-      if ((existing.username || "").toLowerCase() === cleanUsername.toLowerCase()) {
-        return res.status(409).json({ message: "Username already exists." });
-      }
-      return res.status(409).json({ message: "Gmail already exists." });
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    const insertResult = await dbQuery(
-      `INSERT INTO users (gmail, username, password)
-       VALUES (?, ?, ?)`,
-      [cleanGmail, cleanUsername, hashedPassword]
-    );
-
-    for (const hintKey of HINT_KEYS) {
-      await dbQuery(
-        "INSERT INTO user_hints (user_id, hint_key, quantity) VALUES (?, ?, 0)",
-        [insertResult.insertId, hintKey]
-      );
-    }
-
-    await upsertLeaderboardEntry(insertResult.insertId);
-
-    return res.status(201).json({
-      message: "Registration successful",
-    });
-  } catch (error) {
-    console.error("REGISTER ERROR:", error);
-    return res.status(500).json({ message: "Failed to register account." });
-  }
-});
-
-app.post("/login", async (req, res) => {
-  try {
-    const cleanUsername = String(req.body?.username || "").trim();
-    const password = String(req.body?.password || "");
-
-    if (!cleanUsername || !password.trim()) {
-      return res.status(400).json({ message: "Username and password are required." });
-    }
-
-    const rows = await dbQuery(
-      "SELECT id, gmail, username, password FROM users WHERE username = ? LIMIT 1",
-      [cleanUsername]
-    );
-
-    if (!rows.length) {
-      return res.status(401).json({ message: "Invalid username or password." });
-    }
-
-    const userRow = rows[0];
-    const passwordMatches = await bcrypt.compare(password, userRow.password || "");
-
-    if (!passwordMatches) {
-      return res.status(401).json({ message: "Invalid username or password." });
-    }
-
-    const fullUser = await getUserById(userRow.id);
-    return res.json(buildAuthResponse(fullUser));
-  } catch (error) {
-    console.error("LOGIN ERROR:", error);
-    return res.status(500).json({ message: "Failed to login." });
   }
 });
 
@@ -544,6 +431,96 @@ app.post("/google-complete-profile", async (req, res) => {
     }
 
     return res.status(500).json({ message: error.message || "Failed to save profile" });
+  }
+});
+
+
+app.post("/register", async (req, res) => {
+  try {
+    const username = (req.body.username || "").trim();
+    const gmail = (req.body.gmail || "").trim().toLowerCase();
+    const password = String(req.body.password || "");
+
+    if (!username || !gmail || !password) {
+      return res.status(400).json({ message: "Username, Gmail, and password are required" });
+    }
+
+    if (username.length < 3) {
+      return res.status(400).json({ message: "Username must be at least 3 characters" });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ message: "Password must be at least 6 characters" });
+    }
+
+    const existingUsername = await dbQuery("SELECT id FROM users WHERE username = ? LIMIT 1", [username]);
+    if (existingUsername.length > 0) {
+      return res.status(400).json({ message: "Username already exists" });
+    }
+
+    const existingGmail = await dbQuery("SELECT id FROM users WHERE gmail = ? LIMIT 1", [gmail]);
+    if (existingGmail.length > 0) {
+      return res.status(400).json({ message: "Gmail already exists" });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const insertResult = await dbQuery(
+      `INSERT INTO users (gmail, username, password, profile_picture, full_name)
+       VALUES (?, ?, ?, '', '')`,
+      [gmail, username, hashedPassword]
+    );
+
+    for (const hintKey of HINT_KEYS) {
+      await dbQuery(
+        "INSERT INTO user_hints (user_id, hint_key, quantity) VALUES (?, ?, 0)",
+        [insertResult.insertId, hintKey]
+      );
+    }
+
+    await upsertLeaderboardEntry(insertResult.insertId);
+
+    const insertedUser = await getUserById(insertResult.insertId);
+    return res.status(201).json(buildAuthResponse(insertedUser));
+  } catch (error) {
+    console.error("REGISTER ERROR:", error);
+    return res.status(500).json({ message: error.message || "Registration failed" });
+  }
+});
+
+app.post("/login", async (req, res) => {
+  try {
+    const username = (req.body.username || "").trim();
+    const password = String(req.body.password || "");
+
+    if (!username || !password) {
+      return res.status(400).json({ message: "Username and password are required" });
+    }
+
+    const rows = await dbQuery(
+      `SELECT id, gmail, username, password, coins, score, profile_picture, full_name, premium, premium_tier, premium_expiry, created_at
+       FROM users
+       WHERE username = ?
+       LIMIT 1`,
+      [username]
+    );
+
+    if (!rows.length) {
+      return res.status(401).json({ message: "Invalid username or password" });
+    }
+
+    const user = rows[0];
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+
+    if (!isPasswordValid) {
+      return res.status(401).json({ message: "Invalid username or password" });
+    }
+
+    const fullUser = await getUserById(user.id);
+    return res.json(buildAuthResponse(fullUser));
+  } catch (error) {
+    console.error("LOGIN ERROR:", error);
+    return res.status(500).json({ message: error.message || "Login failed" });
   }
 });
 
