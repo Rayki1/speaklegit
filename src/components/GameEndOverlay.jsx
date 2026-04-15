@@ -174,7 +174,7 @@ function GameEndOverlay({
   };
 
     return (
-      <div className={`fixed inset-0 z-[120] flex items-center justify-center px-3 sm:px-4 py-4 transition-all duration-700 ${phase >= 1 ? "bg-[radial-gradient(circle_at_top,rgba(30,41,59,0.55),rgba(2,6,23,0.9)_60%)] backdrop-blur-sm" : "bg-black/0"}`}>
+      <div className={`fixed inset-0 z-[120] flex items-start justify-center overflow-y-auto px-3 py-4 sm:items-center sm:px-4 transition-all duration-700 ${phase >= 1 ? "bg-[radial-gradient(circle_at_top,rgba(30,41,59,0.55),rgba(2,6,23,0.9)_60%)] backdrop-blur-sm" : "bg-black/0"}`}>
       {isAdvancing && (
         <div className="absolute inset-0 z-[200] flex items-center justify-center bg-black/85 backdrop-blur-sm">
           <div className="text-center px-6 py-8 rounded-3xl border border-cyan-300/35 bg-cyan-500/10 shadow-[0_0_45px_rgba(34,211,238,0.25)] transition-all">
@@ -189,7 +189,7 @@ function GameEndOverlay({
         </div>
       )}
 
-        <div className="victory-shell relative w-full max-w-3xl overflow-hidden rounded-[30px] border border-white/15 bg-[#090c1a]/97 shadow-[0_24px_120px_rgba(0,0,0,0.72)]" data-phase={phase}>
+        <div className="victory-shell relative w-full max-w-3xl max-h-[calc(100dvh-2rem)] overflow-y-auto overflow-x-hidden rounded-[30px] border border-white/15 bg-[#090c1a]/97 shadow-[0_24px_120px_rgba(0,0,0,0.72)]" data-phase={phase}>
           <div className={`absolute inset-x-0 top-0 h-2 bg-gradient-to-r ${themeConfig.accent} opacity-95`} />
           <div className={`absolute inset-0 ${themeConfig.glow}`} />
           <div className="absolute inset-0 victory-sheen" />
@@ -235,7 +235,7 @@ function GameEndOverlay({
           </>
         )}
 
-        <div className="relative px-5 py-7 sm:px-7 sm:py-8 md:px-10 md:py-10">
+        <div className="relative px-5 py-7 sm:px-7 sm:py-8 md:px-10 md:py-10 pb-[calc(env(safe-area-inset-bottom)+1rem)]">
           <div className={`text-center transition-all duration-700 ${phase >= 2 ? "translate-y-0 opacity-100" : "-translate-y-8 opacity-0"}`}>
             <p className="text-[10px] uppercase tracking-[0.42em] text-white/40">Victory Banner</p>
             <h2 className="mt-4 text-3xl sm:text-4xl md:text-5xl font-black tracking-[0.09em] text-white drop-shadow-[0_4px_24px_rgba(255,255,255,0.2)]">
