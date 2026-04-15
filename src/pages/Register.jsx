@@ -60,11 +60,15 @@ function Register() {
       }
 
       if (!res.ok) {
-        const exactIssue =
-          data.detail ||
-          data.message ||
-          rawResponse ||
-          `HTTP ${res.status}${res.statusText ? ` ${res.statusText}` : ""}`;
+        const detailText = String(data.detail || "").trim();
+        const messageText = String(data.message || "").trim();
+        const rawText = String(rawResponse || "").trim();
+
+        let exactIssue = detailText || messageText || rawText;
+
+        if (!exactIssue || /^registration failed$/i.test(exactIssue)) {
+          exactIssue = `Server issue (HTTP ${res.status}${res.statusText ? ` ${res.statusText}` : ""}). Check backend env vars and logs.`;
+        }
 
         setError(exactIssue);
         return;

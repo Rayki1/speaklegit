@@ -786,7 +786,7 @@ app.post("/register", async (req, res) => {
     }
 
     return res.status(500).json({
-      message: "Registration failed",
+      message: "Registration error",
       detail: error?.message || String(error) || "Unknown server error",
     });
   }
