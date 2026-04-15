@@ -11,13 +11,27 @@ require("dotenv").config({ path: path.join(__dirname, ".env"), override: true })
 const app = express();
 const { Schema } = mongoose;
 
-const allowedOrigins = new Set(
-  [
-    (process.env.FRONTEND_URL || "").trim(),
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-  ].filter(Boolean)
-);
+function toOrigin(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+
+  try {
+    return new URL(raw).origin;
+  } catch {
+    return "";
+  }
+}
+
+const configuredFrontendOrigins = String(process.env.FRONTEND_URL || "")
+  .split(",")
+  .map((entry) => toOrigin(entry))
+  .filter(Boolean);
+
+const allowedOrigins = new Set([
+  ...configuredFrontendOrigins,
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+]);
 
 app.use(
   cors({
@@ -25,9 +39,11 @@ app.use(
       if (!origin) return callback(null, true);
 
       try {
-        const hostname = new URL(origin).hostname;
+        const parsedOrigin = new URL(origin);
+        const normalizedOrigin = parsedOrigin.origin;
+        const hostname = parsedOrigin.hostname;
         if (
-          allowedOrigins.has(origin) ||
+          allowedOrigins.has(normalizedOrigin) ||
           hostname === "localhost" ||
           hostname === "127.0.0.1" ||
           hostname.endsWith(".vercel.app")
