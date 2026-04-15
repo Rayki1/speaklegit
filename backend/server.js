@@ -1219,13 +1219,12 @@ app.post("/update-score", verifyToken, async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    if (gameCompleted) {
-      userDoc.score = Number(userDoc.score || 0) + safeScore;
-      await userDoc.save();
-    }
+    userDoc.score = Number(userDoc.score || 0) + safeScore;
+    await userDoc.save();
+
+    await upsertLeaderboardEntry(userId, Number(userDoc.score || 0), mode);
 
     if (gameCompleted) {
-      await upsertLeaderboardEntry(userId, Number(userDoc.score || 0), mode);
       await incrementLeaderboardGamesPlayed(userId, mode);
 
       if (won) {

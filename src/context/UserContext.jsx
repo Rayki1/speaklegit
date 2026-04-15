@@ -186,18 +186,60 @@ export function UserProvider({ children }) {
     setUser(getDefaultUser());
   };
 
-  const addScore = (difficulty, correct = true) => calculatePoints(difficulty, correct);
+  const addScore = (difficulty, correct = true) => {
+    const points = calculatePoints(difficulty, correct);
+
+    if (points > 0 && user.loggedIn && !user.isGuest) {
+      syncLeaderboardScore(points, "player1").catch((error) => {
+        console.error("ADD SCORE SYNC ERROR:", error);
+      });
+    }
+
+    return points;
+  };
+
+  const syncLeaderboardScore = async (points, mode = "player1") => {
+    const safePoints = Math.max(0, Number(points || 0));
+
+    if (!safePoints || !user.loggedIn || user.isGuest || mode !== "player1") {
+      return null;
+    }
+
+    setAndPersistUser((prev) => ({
+      ...prev,
+      score: Number(prev.score || 0) + safePoints,
+    }));
+
+    try {
+      const response = await authenticatedFetch("/update-score", {
+        method: "POST",
+        body: JSON.stringify({
+          score: safePoints,
+          mode,
+          gameCompleted: false,
+          won: false,
+        }),
+      });
+
+      updateLeaderboard(user.name, safePoints);
+      fetchLeaderboard();
+      return response;
+    } catch (error) {
+      console.error("LEADERBOARD SYNC ERROR:", error);
+      authenticatedFetch("/me").catch(() => {});
+      throw error;
+    }
+  };
 
   const finalizeRoundScore = async (roundScore, options = {}) => {
     const safeRoundScore = Math.max(0, Number(roundScore || 0));
     const { mode = "player1", won = false } = options;
 
-    setAndPersistUser((prev) => ({
-      ...prev,
-      score: Number(prev.score || 0) + safeRoundScore,
-    }));
-
     if (!user.loggedIn || user.isGuest) {
+      setAndPersistUser((prev) => ({
+        ...prev,
+        score: Number(prev.score || 0) + safeRoundScore,
+      }));
       return { offline: true, score: safeRoundScore };
     }
 
@@ -217,7 +259,6 @@ export function UserProvider({ children }) {
       return response;
     } catch (error) {
       console.error("FINALIZE ROUND SCORE ERROR:", error);
-      authenticatedFetch("/me").catch(() => {});
       throw error;
     }
   };
@@ -431,6 +472,7 @@ export function UserProvider({ children }) {
       canAfford,
       setPremium,
       purchasePremium,
+      syncLeaderboardScore,
       updateLeaderboard,
       getLeaderboard,
       refreshLeaderboard: fetchLeaderboard,
