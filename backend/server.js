@@ -38,6 +38,18 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 5000;
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+let databaseInitPromise = null;
+
+function ensureDatabaseInitialized() {
+  if (!databaseInitPromise) {
+    databaseInitPromise = initializeDatabase().catch((error) => {
+      databaseInitPromise = null;
+      throw error;
+    });
+  }
+
+  return databaseInitPromise;
+}
 
 if (!process.env.JWT_SECRET) {
   console.warn("JWT_SECRET is missing. Auth routes will fail until it is set.");
@@ -1059,14 +1071,21 @@ app.get("/profile", verifyToken, async (req, res) => {
   }
 });
 
-(async () => {
-  try {
-    await initializeDatabase();
-    app.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
-    });
-  } catch (error) {
-    console.error('DATABASE INITIALIZATION ERROR:', error);
-    process.exit(1);
-  }
-})();
+if (require.main === module) {
+  (async () => {
+    try {
+      await ensureDatabaseInitialized();
+      app.listen(PORT, () => {
+        console.log(`Server running on port ${PORT}`);
+      });
+    } catch (error) {
+      console.error('DATABASE INITIALIZATION ERROR:', error);
+      process.exit(1);
+    }
+  })();
+}
+
+module.exports = {
+  app,
+  ensureDatabaseInitialized,
+};
