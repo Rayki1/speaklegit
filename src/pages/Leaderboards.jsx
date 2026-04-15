@@ -6,7 +6,7 @@ function Leaderboards() {
   const [mode, setMode] = useState("player1");
 
   return (
-    <GameLayout title="🏆 Leaderboards">
+    <GameLayout title="🏆 Leaderboards" scrollable>
       <div className="mx-auto max-w-5xl px-3 sm:px-6">
         <p className="mb-6 text-center text-base sm:text-lg text-white/70">
           Check the top scores and climb the Player 1 rankings. Updates stay live while you are on the page.
