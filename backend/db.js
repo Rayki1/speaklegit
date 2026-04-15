@@ -28,6 +28,11 @@ async function initializeDatabase() {
         dbName: dbName || undefined,
         serverSelectionTimeoutMS: 10000,
         maxPoolSize: 10,
+         socketTimeoutMS: 15000,
+         retryWrites: true,
+         w: "majority",
+         ssl: true,
+         rejectUnauthorized: false,
       })
       .then((conn) => {
         const dbLabel = conn.connection.name || dbName || "default";
@@ -35,6 +40,7 @@ async function initializeDatabase() {
         return conn;
       })
       .catch((error) => {
+         console.error("MongoDB connection failed:", error.message);
         globalForMongo.__mongooseConnectionPromise = null;
         throw error;
       });
