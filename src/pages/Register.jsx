@@ -60,8 +60,13 @@ function Register() {
       }
 
       if (!res.ok) {
-        const detail = data.detail ? ` (${data.detail})` : "";
-        setError((data.message || `Registration failed (HTTP ${res.status}).`) + detail);
+        const exactIssue =
+          data.detail ||
+          data.message ||
+          rawResponse ||
+          `HTTP ${res.status}${res.statusText ? ` ${res.statusText}` : ""}`;
+
+        setError(exactIssue);
         return;
       }
 
@@ -85,7 +90,7 @@ function Register() {
       navigate("/login", { replace: true });
     } catch (err) {
       console.error("REGISTER FETCH ERROR:", err);
-      setError("Cannot connect to backend server.");
+      setError(`Cannot connect to backend server: ${err?.message || "Unknown network error"}`);
     } finally {
       setLoading(false);
     }

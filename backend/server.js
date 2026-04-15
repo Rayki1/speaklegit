@@ -785,7 +785,10 @@ app.post("/register", async (req, res) => {
       return res.status(400).json({ message: "Username or Gmail already exists" });
     }
 
-    return res.status(500).json({ message: error.message || "Registration failed" });
+    return res.status(500).json({
+      message: "Registration failed",
+      detail: error?.message || String(error) || "Unknown server error",
+    });
   }
 });
 
