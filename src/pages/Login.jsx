@@ -159,7 +159,7 @@ function Login() {
   return (
     <>
       <Navbar />
-      <div className="landing-hero login-page-hero relative min-h-[100dvh] overflow-y-auto overflow-x-hidden scrollbar-hide px-3 pb-3 pt-[calc(env(safe-area-inset-top)+5.5rem)] sm:px-4 sm:pt-[calc(env(safe-area-inset-top)+5.9rem)] md:px-5 md:pb-6 md:pt-14 lg:min-h-[100dvh] lg:px-6 lg:pt-16 xl:pt-20">
+      <div className="landing-hero login-page-hero relative min-h-[100dvh] overflow-y-auto overflow-x-hidden scrollbar-hide px-3 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pt-[calc(env(safe-area-inset-top)+5.5rem)] sm:px-4 sm:pt-[calc(env(safe-area-inset-top)+5.9rem)] md:px-5 md:pb-[calc(env(safe-area-inset-bottom)+1.5rem)] md:pt-14 lg:min-h-[100dvh] lg:px-6 lg:pt-16 xl:pt-20">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute -top-24 left-0 h-[500px] w-[500px] rounded-full bg-indigo-400/15 blur-[130px]" />
           <div className="absolute top-1/3 right-0 h-[420px] w-[420px] rounded-full bg-pink-400/15 blur-[110px]" />
@@ -187,7 +187,7 @@ function Login() {
           ))}
         </div>
 
-        <div className="relative z-10 mx-auto flex min-h-full w-full max-w-6xl items-stretch py-1 md:py-2 lg:py-3">
+        <div className="relative z-10 mx-auto flex min-h-full w-full max-w-6xl items-stretch py-2 md:py-2 lg:py-3">
           <div className="grid min-h-full w-full gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(340px,420px)] lg:gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(360px,440px)] xl:gap-6">
             <section className="relative hidden rounded-[2rem] border border-white/10 bg-black/20 p-4 shadow-[0_32px_80px_rgba(0,0,0,0.4)] backdrop-blur-2xl md:p-5 xl:p-7 lg:flex lg:max-h-full lg:flex-col lg:overflow-y-auto scrollbar-hide">
               <div className="pointer-events-none absolute inset-0">
@@ -229,7 +229,7 @@ function Login() {
               </div>
             </section>
 
-            <section className="relative flex items-center justify-center">
+            <section className="relative flex items-start justify-center lg:items-center">
               <div className="w-full rounded-[2rem] border border-white/10 bg-black/35 p-5 shadow-[0_25px_90px_rgba(6,10,20,0.55)] backdrop-blur-2xl sm:p-6 xl:p-7">
                 <div className="mb-6 text-center">
                   <p className="text-[10px] font-bold uppercase tracking-[0.32em] text-cyan-200/80">Login Account</p>
