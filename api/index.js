@@ -4,6 +4,7 @@ const require = createRequire(import.meta.url);
 const { app, ensureDatabaseInitialized } = require("../backend/server");
 
 let readyPromise;
+const hasMongoUri = Boolean((process.env.MONGODB_URI || "").trim());
 
 function normalizeRequestUrl(req) {
   const originalUrl = req.url || "/";
@@ -20,22 +21,10 @@ function normalizeRequestUrl(req) {
 
 export default async function handler(req, res) {
   try {
-    if (!process.env.MONGODB_URI) {
-      return res.status(500).json({
-        message: "Server initialization failed",
-        detail: "MONGODB_URI is missing in Vercel environment variables",
-      });
+    if (hasMongoUri) {
+      readyPromise = readyPromise || ensureDatabaseInitialized();
+      await readyPromise;
     }
-
-    if (!process.env.JWT_SECRET) {
-      return res.status(500).json({
-        message: "Server initialization failed",
-        detail: "JWT_SECRET is missing in Vercel environment variables",
-      });
-    }
-
-    readyPromise = readyPromise || ensureDatabaseInitialized();
-    await readyPromise;
 
     normalizeRequestUrl(req);
     return app(req, res);

@@ -64,6 +64,8 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 5000;
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+const HAS_MONGO_URI = Boolean((process.env.MONGODB_URI || "").trim());
+const HAS_JWT_SECRET = Boolean((process.env.JWT_SECRET || "").trim());
 let databaseInitPromise = null;
 let modelBootstrapPromise = null;
 
@@ -72,6 +74,10 @@ async function ensureModelsInitialized() {
 }
 
 function ensureDatabaseInitialized() {
+  if (!HAS_MONGO_URI) {
+    return Promise.resolve(null);
+  }
+
   if (!databaseInitPromise) {
     databaseInitPromise = initializeDatabase()
       .then(async () => {
@@ -261,6 +267,13 @@ const transporter = nodemailer.createTransport({
 });
 
 function verifyToken(req, res, next) {
+  if (!HAS_JWT_SECRET) {
+    return res.status(503).json({
+      message: "Authentication is unavailable",
+      detail: "JWT_SECRET is missing in environment variables",
+    });
+  }
+
   const authHeader = req.headers.authorization;
   const token = authHeader && authHeader.split(" ")[1];
 
@@ -545,10 +558,14 @@ app.get("/", (req, res) => {
 
 app.get("/healthz", async (req, res) => {
   try {
-    await ensureDatabaseInitialized();
-    await mongoose.connection.db.command({ ping: 1 });
+    if (HAS_MONGO_URI) {
+      await ensureDatabaseInitialized();
+      await mongoose.connection.db.command({ ping: 1 });
 
-    res.json({ ok: true, message: "Backend and MongoDB are reachable" });
+      return res.json({ ok: true, message: "Backend and MongoDB are reachable" });
+    }
+
+    res.json({ ok: true, message: "Backend is running without MongoDB" });
   } catch (error) {
     console.error("HEALTH CHECK ERROR:", error);
     const detail =
@@ -1227,6 +1244,13 @@ app.post("/update-score", verifyToken, async (req, res) => {
 
 app.get("/leaderboards", async (req, res) => {
   try {
+    if (!HAS_MONGO_URI) {
+      return res.json({
+        mode: "player1",
+        entries: [],
+      });
+    }
+
     const leaderboardRows = await Leaderboard.find({ mode: "player1" })
       .sort({ score: -1, username: 1 })
       .limit(100)
