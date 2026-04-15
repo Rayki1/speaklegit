@@ -593,6 +593,13 @@ app.get("/me", verifyToken, async (req, res) => {
 
 app.post("/google-login", async (req, res) => {
   try {
+    if (!HAS_JWT_SECRET) {
+      return res.status(503).json({
+        message: "Authentication is unavailable",
+        detail: "JWT_SECRET is missing in environment variables",
+      });
+    }
+
     const { credential } = req.body;
     const googleUser = await verifyGoogleCredential(credential);
     const gmail = googleUser.email.trim().toLowerCase();
@@ -647,6 +654,13 @@ app.post("/google-login", async (req, res) => {
 
 app.post("/google-complete-profile", async (req, res) => {
   try {
+    if (!HAS_JWT_SECRET) {
+      return res.status(503).json({
+        message: "Authentication is unavailable",
+        detail: "JWT_SECRET is missing in environment variables",
+      });
+    }
+
     const { signupToken, username } = req.body;
     const cleanUsername = (username || "").trim();
 
@@ -744,9 +758,9 @@ app.post("/google-complete-profile", async (req, res) => {
 
 app.post("/register", async (req, res) => {
   try {
-    if (!process.env.JWT_SECRET) {
-      return res.status(500).json({
-        message: "Server misconfiguration",
+    if (!HAS_JWT_SECRET) {
+      return res.status(503).json({
+        message: "Authentication is unavailable",
         detail: "JWT_SECRET is missing in environment variables",
       });
     }
@@ -815,6 +829,13 @@ app.post("/register", async (req, res) => {
 
 app.post("/login", async (req, res) => {
   try {
+    if (!HAS_JWT_SECRET) {
+      return res.status(503).json({
+        message: "Authentication is unavailable",
+        detail: "JWT_SECRET is missing in environment variables",
+      });
+    }
+
     const username = (req.body.username || "").trim();
     const password = String(req.body.password || "");
 
