@@ -551,7 +551,14 @@ app.get("/healthz", async (req, res) => {
     res.json({ ok: true, message: "Backend and MongoDB are reachable" });
   } catch (error) {
     console.error("HEALTH CHECK ERROR:", error);
-    res.status(500).json({ ok: false, message: error.message || "Database is not reachable" });
+    const detail =
+      (error && (error.message || error.reason || error.code || error.name)) || String(error);
+
+    res.status(500).json({
+      ok: false,
+      message: "Database is not reachable",
+      detail,
+    });
   }
 });
 
