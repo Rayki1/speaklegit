@@ -96,6 +96,32 @@ function ensureDatabaseInitialized() {
   return databaseInitPromise;
 }
 
+async function ensureDatabaseForRequest(res) {
+  if (!HAS_MONGO_URI) {
+    res.status(503).json({
+      message: "Database is unavailable",
+      detail: "MONGODB_URI is missing in environment variables",
+    });
+    return false;
+  }
+
+  if (mongoose.connection.readyState === 1) {
+    return true;
+  }
+
+  try {
+    await ensureDatabaseInitialized();
+    return true;
+  } catch (error) {
+    console.error("DATABASE CONNECTION ERROR:", error);
+    res.status(503).json({
+      message: "Database connection failed",
+      detail: error?.message || "Unable to connect to MongoDB",
+    });
+    return false;
+  }
+}
+
 if (!process.env.JWT_SECRET) {
   console.warn("JWT_SECRET is missing. Auth routes will fail until it is set.");
 }
@@ -593,6 +619,10 @@ app.get("/me", verifyToken, async (req, res) => {
 
 app.post("/google-login", async (req, res) => {
   try {
+    if (!(await ensureDatabaseForRequest(res))) {
+      return;
+    }
+
     if (!HAS_JWT_SECRET) {
       return res.status(503).json({
         message: "Authentication is unavailable",
@@ -654,6 +684,10 @@ app.post("/google-login", async (req, res) => {
 
 app.post("/google-complete-profile", async (req, res) => {
   try {
+    if (!(await ensureDatabaseForRequest(res))) {
+      return;
+    }
+
     if (!HAS_JWT_SECRET) {
       return res.status(503).json({
         message: "Authentication is unavailable",
@@ -758,6 +792,10 @@ app.post("/google-complete-profile", async (req, res) => {
 
 app.post("/register", async (req, res) => {
   try {
+    if (!(await ensureDatabaseForRequest(res))) {
+      return;
+    }
+
     if (!HAS_JWT_SECRET) {
       return res.status(503).json({
         message: "Authentication is unavailable",
@@ -829,6 +867,10 @@ app.post("/register", async (req, res) => {
 
 app.post("/login", async (req, res) => {
   try {
+    if (!(await ensureDatabaseForRequest(res))) {
+      return;
+    }
+
     if (!HAS_JWT_SECRET) {
       return res.status(503).json({
         message: "Authentication is unavailable",
@@ -865,6 +907,10 @@ app.post("/login", async (req, res) => {
 
 app.post("/forgot-password", async (req, res) => {
   try {
+    if (!(await ensureDatabaseForRequest(res))) {
+      return;
+    }
+
     const { gmail } = req.body;
 
     if (!gmail) {
