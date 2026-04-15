@@ -14,6 +14,13 @@ export default async function handler(req, res) {
       });
     }
 
+    if (!process.env.JWT_SECRET) {
+      return res.status(500).json({
+        message: "Server initialization failed",
+        detail: "JWT_SECRET is missing in Vercel environment variables",
+      });
+    }
+
     readyPromise = readyPromise || ensureDatabaseInitialized();
     await readyPromise;
 

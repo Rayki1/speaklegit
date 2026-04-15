@@ -723,6 +723,13 @@ app.post("/google-complete-profile", async (req, res) => {
 
 app.post("/register", async (req, res) => {
   try {
+    if (!process.env.JWT_SECRET) {
+      return res.status(500).json({
+        message: "Server misconfiguration",
+        detail: "JWT_SECRET is missing in environment variables",
+      });
+    }
+
     const username = (req.body.username || "").trim();
     const gmail = (req.body.gmail || "").trim().toLowerCase();
     const password = String(req.body.password || "");
