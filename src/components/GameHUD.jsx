@@ -2,6 +2,32 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { getRewardAnimationDuration, getTimedRoundSeconds } from "../utils/scoring";
 
 function GameHUD({ time, points, gameState, difficulty, showTimer = true, scoreFx = null, topBracketStreak = 0 }) {
+  const HUD_MARGIN = 12;
+  const HUD_STORAGE_KEY = "speaks-hud-float-pos";
+
+  const clampToBounds = (x, y, width, height) => {
+    if (typeof window === "undefined") return { x, y };
+    const maxX = Math.max(HUD_MARGIN, window.innerWidth - width - HUD_MARGIN);
+    const maxY = Math.max(HUD_MARGIN, window.innerHeight - height - HUD_MARGIN);
+
+    return {
+      x: Math.max(HUD_MARGIN, Math.min(x, maxX)),
+      y: Math.max(HUD_MARGIN, Math.min(y, maxY)),
+    };
+  };
+
+  const snapToNearestSide = (x, width) => {
+    if (typeof window === "undefined") return { x, side: "right" };
+    const leftX = HUD_MARGIN;
+    const rightX = Math.max(HUD_MARGIN, window.innerWidth - width - HUD_MARGIN);
+
+    if (Math.abs(x - leftX) <= Math.abs(x - rightX)) {
+      return { x: leftX, side: "left" };
+    }
+
+    return { x: rightX, side: "right" };
+  };
+
   const getDefaultIntensity = () => {
     if (typeof window === "undefined") return "balanced";
     const memory = Number(window.navigator?.deviceMemory || 0);
@@ -48,17 +74,52 @@ function GameHUD({ time, points, gameState, difficulty, showTimer = true, scoreF
 
   const [hudSettings, setHudSettings] = useState(() => loadSettings());
   const [showSettingsPanel, setShowSettingsPanel] = useState(false);
-  const [hudPosition, setHudPosition] = useState(() => {
-    if (typeof window === "undefined") return "right";
+  const [hudCoords, setHudCoords] = useState(() => {
+    if (typeof window === "undefined") return { x: HUD_MARGIN, y: 96, side: "right" };
+
     try {
-      return window.localStorage.getItem("speaks-hud-position") || "right";
+      const raw = window.localStorage.getItem(HUD_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Number.isFinite(parsed?.x) && Number.isFinite(parsed?.y)) {
+          return {
+            x: parsed.x,
+            y: parsed.y,
+            side: parsed?.side === "left" ? "left" : "right",
+          };
+        }
+      }
     } catch {
-      return "right";
+      // Ignore malformed storage values.
     }
+
+    try {
+      const legacySide = window.localStorage.getItem("speaks-hud-position");
+      if (legacySide === "left") {
+        return { x: HUD_MARGIN, y: 112, side: "left" };
+      }
+    } catch {
+      // Ignore legacy storage failures.
+    }
+
+    return {
+      x: Math.max(HUD_MARGIN, window.innerWidth - 96 - HUD_MARGIN),
+      y: 112,
+      side: "right",
+    };
   });
   const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const hudContainerRef = useRef(null);
+  const dragRef = useRef({
+    pointerId: null,
+    offsetX: 0,
+    offsetY: 0,
+    startX: 0,
+    startY: 0,
+    width: 0,
+    height: 0,
+    moved: false,
+  });
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -67,51 +128,103 @@ function GameHUD({ time, points, gameState, difficulty, showTimer = true, scoreF
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    window.localStorage.setItem("speaks-hud-position", hudPosition);
-  }, [hudPosition]);
+    window.localStorage.setItem(HUD_STORAGE_KEY, JSON.stringify(hudCoords));
+  }, [HUD_STORAGE_KEY, hudCoords]);
 
-  const handleHudDragStart = (e) => {
-    if (e.button !== 0) return; // Only left mouse button
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+
+    const syncPositionToViewport = () => {
+      const node = hudContainerRef.current;
+      if (!node) return;
+
+      const rect = node.getBoundingClientRect();
+      setHudCoords((prev) => {
+        const width = rect.width || 90;
+        const height = rect.height || 150;
+        const bounded = clampToBounds(prev.x, prev.y, width, height);
+
+        if (Math.abs(bounded.x - prev.x) < 0.5 && Math.abs(bounded.y - prev.y) < 0.5) {
+          return prev;
+        }
+
+        return { ...prev, ...bounded };
+      });
+    };
+
+    const timer = window.setTimeout(syncPositionToViewport, 0);
+    window.addEventListener("resize", syncPositionToViewport);
+
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("resize", syncPositionToViewport);
+    };
+  }, []);
+
+  const handleHudPointerDown = (event) => {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    const node = hudContainerRef.current;
+    if (!node) return;
+
+    const rect = node.getBoundingClientRect();
+    dragRef.current = {
+      pointerId: event.pointerId,
+      offsetX: event.clientX - rect.left,
+      offsetY: event.clientY - rect.top,
+      startX: event.clientX,
+      startY: event.clientY,
+      width: rect.width,
+      height: rect.height,
+      moved: false,
+    };
+
     setIsDragging(true);
-    setDragStart({ x: e.clientX, y: e.clientY });
+    event.currentTarget.setPointerCapture?.(event.pointerId);
   };
 
   useEffect(() => {
     if (!isDragging) return;
 
-    const handleMouseMove = (e) => {
-      if (!hudContainerRef.current) return;
-      const dx = e.clientX - dragStart.x;
-      const dy = e.clientY - dragStart.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
+    const handlePointerMove = (event) => {
+      if (event.pointerId !== dragRef.current.pointerId) return;
 
-      // Only trigger magnet if dragged significantly
-      if (distance > 40) {
-        const angle = Math.atan2(dy, dx) * (180 / Math.PI);
-        // Adjust angle so right is 0°, left is 180°, top is -90°, bottom is 90°
-        let position = "right";
-        if (angle > -45 && angle < 45) position = "right";
-        else if (angle >= 45 && angle < 135) position = "bottom";
-        else if (angle >= 135 || angle <= -135) position = "left";
-        else position = "top";
-
-        setHudPosition(position);
-        setIsDragging(false);
+      const dx = event.clientX - dragRef.current.startX;
+      const dy = event.clientY - dragRef.current.startY;
+      if (!dragRef.current.moved && Math.hypot(dx, dy) >= 6) {
+        dragRef.current.moved = true;
       }
+
+      if (!dragRef.current.moved) return;
+
+      const nextX = event.clientX - dragRef.current.offsetX;
+      const nextY = event.clientY - dragRef.current.offsetY;
+      const bounded = clampToBounds(nextX, nextY, dragRef.current.width, dragRef.current.height);
+
+      setHudCoords((prev) => ({ ...prev, ...bounded }));
     };
 
-    const handleMouseUp = () => {
+    const handlePointerUp = (event) => {
+      if (event.pointerId !== dragRef.current.pointerId) return;
       setIsDragging(false);
+
+      setHudCoords((prev) => {
+        const snap = snapToNearestSide(prev.x, dragRef.current.width || 90);
+        return { ...prev, x: snap.x, side: snap.side };
+      });
+
+      dragRef.current.pointerId = null;
     };
 
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+    window.addEventListener("pointercancel", handlePointerUp);
 
     return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+      window.removeEventListener("pointercancel", handlePointerUp);
     };
-  }, [isDragging, dragStart]);
+  }, [isDragging]);
 
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
@@ -241,23 +354,7 @@ function GameHUD({ time, points, gameState, difficulty, showTimer = true, scoreF
     };
   }, [timerStage, showTimer, hudSettings.audioEnabled, intensityProfile.tickVolume]);
 
-  const getHudPositionClass = () => {
-    const baseClass = "fixed z-50 flex gap-2 pointer-events-none";
-    const alignItems = "items-end";
-    
-    switch(hudPosition) {
-      case "left":
-        return `${baseClass} left-3 sm:left-5 top-1/2 -translate-y-1/2 flex-col ${alignItems}`;
-      case "right":
-        return `${baseClass} right-3 sm:right-5 top-1/2 -translate-y-1/2 flex-col ${alignItems}`;
-      case "top":
-        return `${baseClass} top-[72px] left-1/2 -translate-x-1/2 flex-row ${alignItems}`;
-      case "bottom":
-        return `${baseClass} bottom-[20px] left-1/2 -translate-x-1/2 flex-row justify-center`;
-      default:
-        return `${baseClass} right-3 sm:right-5 top-1/2 -translate-y-1/2 flex-col ${alignItems}`;
-    }
-  };
+  const timerStageLabel = timerStage === "calm" ? "Calm" : timerStage === "hurry" ? "Hurry" : "Panic";
 
   return (
     <>
@@ -319,8 +416,9 @@ function GameHUD({ time, points, gameState, difficulty, showTimer = true, scoreF
 
       <div 
         ref={hudContainerRef}
-        onMouseDown={handleHudDragStart}
-        className={`${getHudPositionClass()} ${isDragging ? "cursor-grabbing" : "cursor-grab"} select-none transition-all duration-300`}
+        onPointerDown={handleHudPointerDown}
+        className={`fixed z-50 flex flex-col items-end gap-2 pointer-events-auto select-none touch-none ${isDragging ? "cursor-grabbing" : "cursor-grab"} ${isDragging ? "" : "transition-[left,top] duration-300 ease-out"}`}
+        style={{ left: `${hudCoords.x}px`, top: `${hudCoords.y}px` }}
       >
         <div className="relative pointer-events-auto">
           <button
