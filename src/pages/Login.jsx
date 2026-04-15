@@ -159,7 +159,7 @@ function Login() {
   return (
     <>
       <Navbar />
-      <div className="landing-hero login-page-hero relative min-h-[100dvh] overflow-y-auto overflow-x-hidden scrollbar-hide px-3 pb-3 pt-[calc(env(safe-area-inset-top)+5.5rem)] sm:px-4 sm:pt-[calc(env(safe-area-inset-top)+5.9rem)] md:px-5 md:pb-6 md:pt-14 lg:h-[100dvh] lg:overflow-hidden lg:px-6 lg:pt-16 xl:pt-20">
+      <div className="landing-hero login-page-hero relative min-h-[100dvh] overflow-y-auto overflow-x-hidden scrollbar-hide px-3 pb-3 pt-[calc(env(safe-area-inset-top)+5.5rem)] sm:px-4 sm:pt-[calc(env(safe-area-inset-top)+5.9rem)] md:px-5 md:pb-6 md:pt-14 lg:min-h-[100dvh] lg:px-6 lg:pt-16 xl:pt-20">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute -top-24 left-0 h-[500px] w-[500px] rounded-full bg-indigo-400/15 blur-[130px]" />
           <div className="absolute top-1/3 right-0 h-[420px] w-[420px] rounded-full bg-pink-400/15 blur-[110px]" />
