@@ -83,7 +83,7 @@ function buildTiles(words) {
 }
 
 export default function SentenceScramble({ difficulty, onNextDifficulty }) {
-  const { addScore, updateStreak, addWordPracticed, user, spendCoins, canAfford } = useContext(UserContext);
+  const { addScore, finalizeRoundScore, updateStreak, addWordPracticed, user, spendCoins, canAfford } = useContext(UserContext);
   const playError = useErrorSound();
   const [roundSeed, setRoundSeed] = useState(0);
   const adaptiveDifficulty = useMemo(
@@ -234,7 +234,7 @@ export default function SentenceScramble({ difficulty, onNextDifficulty }) {
 
   const advance = () => {
     const next = index + 1;
-    if (next >= ROUND_LENGTH) { setRoundComplete(true); } else { setIndex(next); }
+    if (next >= ROUND_LENGTH) { finalizeRoundScore(score).catch(() => {}); setRoundComplete(true); } else { setIndex(next); }
   };
 
   const checkAnswer = () => {

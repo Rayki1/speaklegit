@@ -95,7 +95,7 @@ function scoreAccuracy(input, expected) {
 }
 
 export default function PhraseMaster({ difficulty, onNextDifficulty }) {
-  const { addScore, updateStreak, addWordPracticed, user, spendCoins, canAfford } = useContext(UserContext);
+  const { addScore, finalizeRoundScore, updateStreak, addWordPracticed, user, spendCoins, canAfford } = useContext(UserContext);
   const playError = useErrorSound();
   const [roundSeed, setRoundSeed] = useState(0);
   const adaptiveDifficulty = useMemo(
@@ -272,7 +272,7 @@ export default function PhraseMaster({ difficulty, onNextDifficulty }) {
 
   const advance = () => {
     const next = index + 1;
-    if (next >= ROUND_LENGTH) { setRoundComplete(true); return; }
+    if (next >= ROUND_LENGTH) { finalizeRoundScore(score).catch(() => {}); setRoundComplete(true); return; }
     setIndex(next);
     setPhase("choose");
     setSelectedChoice(null);

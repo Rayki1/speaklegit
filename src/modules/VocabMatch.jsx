@@ -170,7 +170,7 @@ function shuffleArray(arr) {
 }
 
 export default function VocabMatch({ difficulty, onNextDifficulty }) {
-  const { addScore, updateStreak, addWordPracticed, user, spendCoins, canAfford } = useContext(UserContext);
+  const { addScore, finalizeRoundScore, updateStreak, addWordPracticed, user, spendCoins, canAfford } = useContext(UserContext);
   const playError = useErrorSound();
   const [roundSeed, setRoundSeed] = useState(0);
   const adaptiveDifficulty = useMemo(
@@ -238,6 +238,7 @@ export default function VocabMatch({ difficulty, onNextDifficulty }) {
   const advanceSet = () => {
     const next = setIndex + 1;
     if (next >= TOTAL_SETS) {
+      finalizeRoundScore(score).catch(() => {});
       setRoundComplete(true);
     } else {
       setSetIndex(next);
