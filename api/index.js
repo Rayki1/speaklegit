@@ -23,7 +23,9 @@ export default async function handler(req, res) {
   try {
     if (hasMongoUri) {
       readyPromise = readyPromise || ensureDatabaseInitialized();
-      await readyPromise;
+      readyPromise.catch((error) => {
+        console.warn("DATABASE WARMUP FAILED:", error.message || error);
+      });
     }
 
     normalizeRequestUrl(req);
