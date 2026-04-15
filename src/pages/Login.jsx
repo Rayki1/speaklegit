@@ -58,6 +58,11 @@ function Login() {
     const token = data?.token;
     const directUser = data?.user || data?.userData || data?.profile || null;
 
+    // Fast path: login response already includes user data.
+    if (directUser) {
+      return directUser;
+    }
+
     if (token) {
       try {
         const profileRes = await fetch(apiUrl("/me"), {
@@ -70,10 +75,6 @@ function Login() {
       } catch {
         // fallback to direct payload
       }
-    }
-
-    if (directUser) {
-      return directUser;
     }
 
     throw new Error("Missing login token.");
