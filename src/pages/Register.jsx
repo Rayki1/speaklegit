@@ -60,7 +60,8 @@ function Register() {
       }
 
       if (!res.ok) {
-        setError(data.message || `Registration failed (HTTP ${res.status}).`);
+        const detail = data.detail ? ` (${data.detail})` : "";
+        setError((data.message || `Registration failed (HTTP ${res.status}).`) + detail);
         return;
       }
 
