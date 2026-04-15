@@ -5,6 +5,7 @@ const jwt = require("jsonwebtoken");
 const nodemailer = require("nodemailer");
 const crypto = require("crypto");
 const db = require("./db");
+const { initializeDatabase } = db;
 require("dotenv").config();
 
 const app = express();
@@ -1058,6 +1059,14 @@ app.get("/profile", verifyToken, async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+(async () => {
+  try {
+    await initializeDatabase();
+    app.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+    });
+  } catch (error) {
+    console.error('DATABASE INITIALIZATION ERROR:', error);
+    process.exit(1);
+  }
+})();

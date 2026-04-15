@@ -1,6 +1,8 @@
 CREATE DATABASE IF NOT EXISTS speaks_app;
 USE speaks_app;
 
+-- Run this on an existing deployment database to align the schema used by the backend.
+
 CREATE TABLE IF NOT EXISTS users (
   id INT NOT NULL AUTO_INCREMENT,
   gmail VARCHAR(255) NOT NULL,
@@ -19,6 +21,19 @@ CREATE TABLE IF NOT EXISTS users (
   UNIQUE KEY username (username)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+ALTER TABLE users
+  MODIFY gmail VARCHAR(255) NOT NULL,
+  MODIFY username VARCHAR(100) NOT NULL,
+  MODIFY password VARCHAR(255) NOT NULL,
+  MODIFY coins INT NOT NULL DEFAULT 0,
+  MODIFY score INT NOT NULL DEFAULT 0,
+  MODIFY profile_picture VARCHAR(500) DEFAULT '',
+  MODIFY full_name VARCHAR(255) DEFAULT '',
+  MODIFY premium TINYINT(1) NOT NULL DEFAULT 0,
+  MODIFY premium_tier VARCHAR(100) DEFAULT NULL,
+  MODIFY premium_expiry DATETIME DEFAULT NULL,
+  MODIFY created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP;
+
 CREATE TABLE IF NOT EXISTS leaderboard (
   id INT NOT NULL AUTO_INCREMENT,
   user_id INT NOT NULL,
@@ -31,33 +46,7 @@ CREATE TABLE IF NOT EXISTS leaderboard (
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY unique_user_mode (user_id, mode),
-  KEY idx_leaderboard_score (score),
-  CONSTRAINT fk_leaderboard_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS coin_purchases (
-  id INT NOT NULL AUTO_INCREMENT,
-  user_id INT NOT NULL,
-  coins_bought INT NOT NULL,
-  amount DECIMAL(10,2) NOT NULL,
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  KEY user_id (user_id),
-  CONSTRAINT fk_coin_purchases_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS premium_purchases (
-  id INT NOT NULL AUTO_INCREMENT,
-  user_id INT NOT NULL,
-  premium_tier VARCHAR(100) NOT NULL,
-  cost_coins INT NOT NULL DEFAULT 0,
-  duration_days INT NOT NULL,
-  bonus_coins INT NOT NULL DEFAULT 0,
-  expires_at DATETIME NOT NULL,
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  KEY user_id (user_id),
-  CONSTRAINT fk_premium_purchases_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  KEY idx_leaderboard_score (score)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS user_hints (
@@ -68,8 +57,7 @@ CREATE TABLE IF NOT EXISTS user_hints (
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
-  UNIQUE KEY unique_user_hint (user_id, hint_key),
-  CONSTRAINT fk_user_hints_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  UNIQUE KEY unique_user_hint (user_id, hint_key)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS wallet_transactions (
@@ -85,8 +73,30 @@ CREATE TABLE IF NOT EXISTS wallet_transactions (
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   last_transaction_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
-  UNIQUE KEY unique_wallet_aggregate (user_id, aggregate_key),
-  CONSTRAINT fk_wallet_transactions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  UNIQUE KEY unique_wallet_aggregate (user_id, aggregate_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS coin_purchases (
+  id INT NOT NULL AUTO_INCREMENT,
+  user_id INT NOT NULL,
+  coins_bought INT NOT NULL,
+  amount DECIMAL(10,2) NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY user_id (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS premium_purchases (
+  id INT NOT NULL AUTO_INCREMENT,
+  user_id INT NOT NULL,
+  premium_tier VARCHAR(100) NOT NULL,
+  cost_coins INT NOT NULL DEFAULT 0,
+  duration_days INT NOT NULL,
+  bonus_coins INT NOT NULL DEFAULT 0,
+  expires_at DATETIME NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY user_id (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS password_resets (
@@ -97,8 +107,7 @@ CREATE TABLE IF NOT EXISTS password_resets (
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY reset_token (reset_token),
-  KEY user_id (user_id),
-  CONSTRAINT fk_password_resets_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  KEY user_id (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS contact_messages (

@@ -48,10 +48,19 @@ function Register() {
         }),
       });
 
-      const data = await res.json();
+      const rawResponse = await res.text();
+      let data = {};
+
+      try {
+        data = rawResponse ? JSON.parse(rawResponse) : {};
+      } catch (parseError) {
+        console.error("REGISTER PARSE ERROR:", parseError, rawResponse);
+        setError(rawResponse || "The server returned an invalid response.");
+        return;
+      }
 
       if (!res.ok) {
-        setError(data.message || "Registration failed.");
+        setError(data.message || `Registration failed (HTTP ${res.status}).`);
         return;
       }
 
