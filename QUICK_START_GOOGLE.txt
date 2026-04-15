@@ -1,15 +1,24 @@
-GOOGLE LOGIN IS ALREADY CONFIGURED WITH YOUR CLIENT ID.
+GOOGLE LOGIN + MONGODB ATLAS QUICK START
 
-What to run:
-1) Frontend/root terminal:
+1) Frontend terminal (project root):
+   npm install
    npm run dev
 
 2) Backend terminal:
    cd backend
+   npm install
    node server.js
 
-Make sure Google Cloud OAuth client includes:
-- Authorized JavaScript origin: http://localhost:5173
-- Authorized redirect URI: http://localhost:5173
+Required backend/.env values:
+- MONGODB_URI=your_mongodb_atlas_connection_string
+- MONGODB_DB_NAME=speaks_app
+- JWT_SECRET=your_secret_here
+- GOOGLE_CLIENT_ID=your_google_client_id_here
+- FRONTEND_URL=http://localhost:5173
 
-If your frontend runs on a different port, update the OAuth client to match that port.
+Google Cloud OAuth client must include:
+- Authorized JavaScript origin: http://localhost:5173
+
+Notes:
+- This project now uses MongoDB Atlas only.
+- No MySQL or SQL import file is needed.

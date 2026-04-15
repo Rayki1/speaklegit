@@ -2,59 +2,55 @@
 
 SPEAKS is an interactive English game to build pronunciation, spelling, and vocabulary skills with friendly feedback and simple English-only prompts.
 
+## Database
+This version uses **MongoDB Atlas only**.
+There is no MySQL database file and no MySQL connection required.
+The collection-by-collection schema is documented in [backend/DATABASE_SCHEMA.md](backend/DATABASE_SCHEMA.md).
+
 ## Features
 - Gradient landing page with arcade-style title
-- **Game Flow:** Landing → Login → Mode Selection → Game Menu → Individual Games
-- **Game Modes:** One Player or Two Player
-- **Available Games:**
-  - 🎤 Pronunciation Practice - Voice recognition feedback
-  - ✏️ Spelling Challenge - Unscramble words
-  - 📖 Vocabulary Builder - Image-based clues
-  - 🎭 **Movie Lines Challenge** - Perform Filipino movie lines in English with emotion!
+- Landing → Login → Mode Selection → Game Menu → Individual Games
+- One Player or Two Player mode
+- Pronunciation, spelling, vocabulary, and movie lines activities
 - Progress dashboard with scores, badges, and streaks
-- React Router navigation across game pages
-- TailwindCSS with forms + typography plugins
-
-## Game Flow
-1. **Landing Page** - Welcome and overview
-2. **Login** - Enter your name
-3. **Mode Selection** - Choose One Player or Two Player
-4. **Game Menu** - Select which game to play
-5. **Individual Games** - Play and practice
-6. **Progress Tracking** - View your stats and achievements
+- Google login, JWT auth, forgot-password email flow
+- TailwindCSS frontend and Node/Express backend
 
 ## Project Structure
-```
+```text
 src/
-├── pages/           # Main pages (Landing, Login, Mode Selection, Game Menu)
-├── modules/         # Reusable learning modules (Pronunciation, Spelling, Vocabulary)
-├── games/           # Standalone games (MovieLines)
-├── components/      # Reusable UI (Button, Card, Navbar, Footer)
-├── layouts/         # Page layouts (LandingLayout, GameLayout)
-├── context/         # Global state (UserContext)
-├── hooks/           # Custom hooks (useSpeechRecognition)
-├── utils/           # Helper functions (scoring.js)
+├── pages/
+├── modules/
+├── games/
+├── components/
+├── layouts/
+├── context/
+├── hooks/
+└── utils/
 ```
 
-## Getting Started
-1. Install dependencies: `npm install`
-2. Start the dev server: `npm run dev`
+## Local Setup
+### Frontend
+1. Install dependencies:
+   `npm install`
+2. Set root `.env`:
+   `VITE_API_URL=http://localhost:5000`
+3. Start frontend:
+   `npm run dev`
 
-## New Feature: Movie Lines Challenge 🎭
-A standalone game where students:
-- Pronounce famous Filipino movie lines translated to English
-- Perform with the correct emotion (angry, romantic, sad, confident, happy, dramatic)
-- Get feedback on pronunciation accuracy
-- Earn points for emotional delivery
-
-## Roadmap
-- ✅ Phase 1: Setup project structure + Tailwind config
-- ✅ Phase 2: Build Landing Page + Navbar/Footer
-- ✅ Phase 3: Implement Pronunciation, Spelling, Vocabulary modules
-- ✅ Phase 4: Add scoring + progress tracking
-- ✅ Phase 5: Add Movie Lines Challenge game
-- 🔜 Phase 6: Add difficulty levels and advanced emotion detection
+### Backend
+1. Go to backend:
+   `cd backend`
+2. Install dependencies:
+   `npm install`
+3. Set `backend/.env`:
+   - `MONGODB_URI=your_mongodb_atlas_connection_string`
+   - `MONGODB_DB_NAME=speaks_app`
+   - `JWT_SECRET=your_secret_here`
+   - `FRONTEND_URL=http://localhost:5173`
+4. Start backend:
+   `node server.js`
 
 ## Notes
-- `public/logo.png` is a placeholder. Replace it with your final logo asset.
-- Speech recognition requires HTTPS in production (works on localhost for development)
+- Speech recognition needs HTTPS in production.
+- For Vercel deployment, set the same MongoDB Atlas variables in project environment settings.

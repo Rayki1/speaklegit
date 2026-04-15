@@ -4,8 +4,9 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const nodemailer = require("nodemailer");
 const crypto = require("crypto");
+const path = require("path");
 const { mongoose, initializeDatabase } = require("./db");
-require("dotenv").config();
+require("dotenv").config({ path: path.join(__dirname, ".env"), override: true });
 
 const app = express();
 const { Schema } = mongoose;
@@ -58,7 +59,11 @@ function ensureDatabaseInitialized() {
   if (!databaseInitPromise) {
     databaseInitPromise = initializeDatabase()
       .then(async () => {
-        await ensureModelsInitialized();
+        try {
+          await ensureModelsInitialized();
+        } catch (error) {
+          console.error("MODEL INITIALIZATION WARNING:", error);
+        }
       })
       .catch((error) => {
         databaseInitPromise = null;
