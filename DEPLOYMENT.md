@@ -24,3 +24,24 @@
 - React Router refreshes work because `vercel.json` rewrites all routes to `index.html`.
 - Frontend API calls use `/api` in production by default.
 - MongoDB Atlas replaces MySQL in this deployment flow.
+
+
+## Required Vercel Environment Variables
+Set these in **Vercel → Project Settings → Environment Variables**:
+
+- `MONGODB_URI` = your MongoDB Atlas connection string
+- `MONGODB_DB_NAME` = your database name, for example `speaks_app`
+- `JWT_SECRET` = any long random secret
+- `FRONTEND_URL` = your exact Vercel site URL, for example `https://your-app.vercel.app`
+- `VITE_API_URL` = `/api`
+
+Optional if you use email and Google auth:
+
+- `EMAIL_USER`
+- `EMAIL_PASS`
+- `CONTACT_RECEIVER_EMAIL`
+- `GOOGLE_CLIENT_ID`
+- `VITE_GOOGLE_CLIENT_ID`
+
+## Important
+For Vercel, do **not** point the frontend to `localhost` after deployment. Keep `VITE_API_URL=/api` so the frontend calls the same deployed project.

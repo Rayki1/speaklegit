@@ -1,7 +1,20 @@
 {
+<<<<<<< HEAD
   "routes": [
     { "src": "/api(?:/(.*))?", "dest": "/api/index" },
     { "handle": "filesystem" },
     { "src": "/(.*)", "dest": "/index.html" }
+=======
+  "version": 2,
+  "functions": {
+    "api/index.js": {
+      "runtime": "nodejs22.x"
+    }
+  },
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/index" },
+    { "source": "/api", "destination": "/api/index" },
+    { "source": "/((?!api/|assets/|.*\\..*).*)", "destination": "/index.html" }
+>>>>>>> fbde872 (update)
   ]
 }

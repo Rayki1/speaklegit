@@ -5,6 +5,19 @@ const { app, ensureDatabaseInitialized } = require("../backend/server");
 
 let readyPromise;
 
+function normalizeRequestUrl(req) {
+  const originalUrl = req.url || "/";
+
+  if (originalUrl === "/api" || originalUrl === "/api/") {
+    req.url = "/";
+    return;
+  }
+
+  if (originalUrl.startsWith("/api/")) {
+    req.url = originalUrl.slice(4) || "/";
+  }
+}
+
 export default async function handler(req, res) {
   try {
     if (!process.env.MONGODB_URI) {
@@ -24,12 +37,7 @@ export default async function handler(req, res) {
     readyPromise = readyPromise || ensureDatabaseInitialized();
     await readyPromise;
 
-    if (req.url === "/api") {
-      req.url = "/";
-    } else if (req.url.startsWith("/api/")) {
-      req.url = req.url.slice(4);
-    }
-
+    normalizeRequestUrl(req);
     return app(req, res);
   } catch (error) {
     console.error("VERCEL API INITIALIZATION ERROR:", error);
