@@ -48,11 +48,70 @@ function GameHUD({ time, points, gameState, difficulty, showTimer = true, scoreF
 
   const [hudSettings, setHudSettings] = useState(() => loadSettings());
   const [showSettingsPanel, setShowSettingsPanel] = useState(false);
+  const [hudPosition, setHudPosition] = useState(() => {
+    if (typeof window === "undefined") return "right";
+    try {
+      return window.localStorage.getItem("speaks-hud-position") || "right";
+    } catch {
+      return "right";
+    }
+  });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const hudContainerRef = useRef(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     window.localStorage.setItem("speaks-hud-settings", JSON.stringify(hudSettings));
   }, [hudSettings]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("speaks-hud-position", hudPosition);
+  }, [hudPosition]);
+
+  const handleHudDragStart = (e) => {
+    if (e.button !== 0) return; // Only left mouse button
+    setIsDragging(true);
+    setDragStart({ x: e.clientX, y: e.clientY });
+  };
+
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handleMouseMove = (e) => {
+      if (!hudContainerRef.current) return;
+      const dx = e.clientX - dragStart.x;
+      const dy = e.clientY - dragStart.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      // Only trigger magnet if dragged significantly
+      if (distance > 40) {
+        const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+        // Adjust angle so right is 0°, left is 180°, top is -90°, bottom is 90°
+        let position = "right";
+        if (angle > -45 && angle < 45) position = "right";
+        else if (angle >= 45 && angle < 135) position = "bottom";
+        else if (angle >= 135 || angle <= -135) position = "left";
+        else position = "top";
+
+        setHudPosition(position);
+        setIsDragging(false);
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isDragging, dragStart]);
 
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
@@ -182,7 +241,23 @@ function GameHUD({ time, points, gameState, difficulty, showTimer = true, scoreF
     };
   }, [timerStage, showTimer, hudSettings.audioEnabled, intensityProfile.tickVolume]);
 
-  const timerStageLabel = timerStage === "calm" ? "Calm" : timerStage === "hurry" ? "Hurry" : "Panic";
+  const getHudPositionClass = () => {
+    const baseClass = "fixed z-50 flex gap-2 pointer-events-none";
+    const alignItems = "items-end";
+    
+    switch(hudPosition) {
+      case "left":
+        return `${baseClass} left-3 sm:left-5 top-1/2 -translate-y-1/2 flex-col ${alignItems}`;
+      case "right":
+        return `${baseClass} right-3 sm:right-5 top-1/2 -translate-y-1/2 flex-col ${alignItems}`;
+      case "top":
+        return `${baseClass} top-[72px] left-1/2 -translate-x-1/2 flex-row ${alignItems}`;
+      case "bottom":
+        return `${baseClass} bottom-[20px] left-1/2 -translate-x-1/2 flex-row justify-center`;
+      default:
+        return `${baseClass} right-3 sm:right-5 top-1/2 -translate-y-1/2 flex-col ${alignItems}`;
+    }
+  };
 
   return (
     <>
@@ -242,7 +317,11 @@ function GameHUD({ time, points, gameState, difficulty, showTimer = true, scoreF
         </div>
       )}
 
-      <div className="fixed top-auto bottom-[20px] right-3 sm:right-5 sm:top-[72px] sm:bottom-auto z-50 flex flex-col items-end gap-2 pointer-events-none">
+      <div 
+        ref={hudContainerRef}
+        onMouseDown={handleHudDragStart}
+        className={`${getHudPositionClass()} ${isDragging ? "cursor-grabbing" : "cursor-grab"} select-none transition-all duration-300`}
+      >
         <div className="relative pointer-events-auto">
           <button
             onClick={() => setShowSettingsPanel((prev) => !prev)}
