@@ -16,6 +16,29 @@ function Register() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const resolveHealthIssue = async () => {
+    try {
+      const healthRes = await fetch(apiUrl("/healthz"));
+      const raw = await healthRes.text();
+
+      let health = {};
+      try {
+        health = raw ? JSON.parse(raw) : {};
+      } catch {
+        health = {};
+      }
+
+      if (!healthRes.ok) {
+        const detail = String(health.detail || health.message || raw || "").trim();
+        return detail || `Backend health check failed (HTTP ${healthRes.status}).`;
+      }
+
+      return "Backend is reachable, but register API returned HTTP 500. Check Vercel function logs for /api/register.";
+    } catch (healthError) {
+      return `Could not run backend health check: ${healthError?.message || "Unknown error"}`;
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -67,7 +90,8 @@ function Register() {
         let exactIssue = detailText || messageText || rawText;
 
         if (!exactIssue || /^registration failed$/i.test(exactIssue)) {
-          exactIssue = `Server issue (HTTP ${res.status}${res.statusText ? ` ${res.statusText}` : ""}). Check backend env vars and logs.`;
+          const healthIssue = await resolveHealthIssue();
+          exactIssue = `Main issue: ${healthIssue}`;
         }
 
         setError(exactIssue);
