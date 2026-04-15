@@ -1,44 +1,16 @@
-import { useContext, useEffect, useState } from "react";
+import { useState } from "react";
 import GameLayout from "../layouts/GameLayout";
 import Leaderboard from "../components/Leaderboard";
-import { UserContext } from "../context/UserContext";
-import { useRealtimeLeaderboard } from "../hooks/useRealtimeLeaderboard";
 
 function Leaderboards() {
   const [mode, setMode] = useState("player1");
-  const { refreshLeaderboard } = useContext(UserContext);
-  const [lastUpdated, setLastUpdated] = useState(new Date());
-
-  // Enable real-time updates
-  const { manualRefresh } = useRealtimeLeaderboard(
-    async () => {
-      await refreshLeaderboard?.();
-      setLastUpdated(new Date());
-    },
-    5000,
-    true
-  );
-
-  useEffect(() => {
-    refreshLeaderboard?.();
-  }, []);
-
-  const formatTime = (date) => {
-    const hours = String(date.getHours()).padStart(2, "0");
-    const minutes = String(date.getMinutes()).padStart(2, "0");
-    return `${hours}:${minutes}`;
-  };
 
   return (
     <GameLayout title="🏆 Leaderboards">
       <div className="mx-auto max-w-5xl px-3 sm:px-6">
         <p className="mb-6 text-center text-base sm:text-lg text-white/70">
-          Check the top scores and climb the Player 1 rankings.
+          Check the top scores and climb the Player 1 rankings. Updates stay live while you are on the page.
         </p>
-
-        <div className="mb-4 text-center text-xs text-white/50">
-          Last updated: {formatTime(lastUpdated)}
-        </div>
 
         <div className="mb-6 grid gap-3 sm:gap-4 md:grid-cols-2">
           <button

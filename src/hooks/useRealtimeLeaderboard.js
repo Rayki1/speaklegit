@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /**
  * Custom hook to enable real-time leaderboard updates
@@ -9,55 +9,91 @@ import { useEffect, useRef } from "react";
  * @param {boolean} enabled - Whether to enable auto-refresh (default: true)
  */
 export function useRealtimeLeaderboard(refreshFunction, intervalMs = 5000, enabled = true) {
-  const intervalRef = useRef(null);
+  const timeoutRef = useRef(null);
   const isActiveRef = useRef(true);
+  const isMountedRef = useRef(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastSyncedAt, setLastSyncedAt] = useState(null);
 
   useEffect(() => {
     if (!enabled || !refreshFunction) return;
 
+    isMountedRef.current = true;
+
+    const clearTimer = () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    };
+
+    const scheduleNextRefresh = () => {
+      clearTimer();
+
+      if (!isMountedRef.current || !isActiveRef.current) {
+        return;
+      }
+
+      timeoutRef.current = setTimeout(async () => {
+        if (!isMountedRef.current || !isActiveRef.current) {
+          return;
+        }
+
+        setIsRefreshing(true);
+
+        try {
+          await refreshFunction();
+          if (isMountedRef.current) {
+            setLastSyncedAt(new Date());
+          }
+        } finally {
+          if (isMountedRef.current) {
+            setIsRefreshing(false);
+            scheduleNextRefresh();
+          }
+        }
+      }, intervalMs);
+    };
+
     // Set up visibility change listener to pause updates when tab is not visible
     const handleVisibilityChange = () => {
       isActiveRef.current = !document.hidden;
-      
-      if (isActiveRef.current && !intervalRef.current) {
-        // Resume updates when tab becomes visible
+
+      if (isActiveRef.current) {
         refreshFunction();
-        intervalRef.current = setInterval(refreshFunction, intervalMs);
-      } else if (!isActiveRef.current && intervalRef.current) {
-        // Pause updates when tab is hidden to save bandwidth
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
+        setLastSyncedAt(new Date());
+        scheduleNextRefresh();
+      } else {
+        clearTimer();
       }
     };
 
     // Initial refresh
-    refreshFunction();
-
-    // Set up interval
-    intervalRef.current = setInterval(() => {
-      if (isActiveRef.current) {
-        refreshFunction();
+    (async () => {
+      setIsRefreshing(true);
+      try {
+        await refreshFunction();
+        if (isMountedRef.current) {
+          setLastSyncedAt(new Date());
+        }
+      } finally {
+        if (isMountedRef.current) {
+          setIsRefreshing(false);
+          scheduleNextRefresh();
+        }
       }
-    }, intervalMs);
+    })();
 
     // Listen for visibility changes
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     // Cleanup
     return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
+      isMountedRef.current = false;
+      clearTimer();
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [enabled, refreshFunction, intervalMs]);
 
-  // Function to manually trigger refresh
-  const manualRefresh = () => {
-    if (refreshFunction) {
-      refreshFunction();
-    }
-  };
-
-  return { manualRefresh };
+  return { isRefreshing, lastSyncedAt };
 }

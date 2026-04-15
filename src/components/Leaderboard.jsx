@@ -1,22 +1,13 @@
-import { useContext, useMemo, useEffect, useState } from "react";
+import { useContext, useMemo } from "react";
 import Card from "./Card";
 import { UserContext } from "../context/UserContext";
 import { useRealtimeLeaderboard } from "../hooks/useRealtimeLeaderboard";
 
 function Leaderboard() {
   const { leaderboard, user, refreshLeaderboard } = useContext(UserContext);
-  const [isSyncing, setIsSyncing] = useState(false);
 
   // Enable real-time updates that refresh every 5 seconds
-  const { manualRefresh } = useRealtimeLeaderboard(
-    async () => {
-      setIsSyncing(true);
-      await refreshLeaderboard?.();
-      setIsSyncing(false);
-    },
-    5000,
-    true
-  );
+  const { isRefreshing, lastSyncedAt } = useRealtimeLeaderboard(() => refreshLeaderboard?.(), 5000, true);
 
   const displayLeaderboard = useMemo(() => {
     if (leaderboard.length === 0) {
@@ -44,22 +35,15 @@ function Leaderboard() {
   return (
     <div className="space-y-6">
       <div>
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-center text-lg font-bold uppercase tracking-widest text-white sm:text-xl">
+        <div className="mb-4 flex flex-col items-center gap-2 text-center sm:flex-row sm:justify-between sm:text-left">
+          <h2 className="text-lg font-bold uppercase tracking-widest text-white sm:text-xl">
             🏆 Player 1 Leaderboard
           </h2>
-          <button
-            onClick={manualRefresh}
-            disabled={isSyncing}
-            className={`rounded-lg px-3 py-1 text-sm font-semibold transition ${
-              isSyncing
-                ? "cursor-wait bg-gray-500/30 text-gray-300"
-                : "bg-blue-500/20 text-blue-300 hover:bg-blue-500/30"
-            }`}
-            title="Manually refresh leaderboard"
-          >
-            {isSyncing ? "🔄 Syncing..." : "🔄 Refresh"}
-          </button>
+          <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/60 backdrop-blur-sm">
+            <span className={`mr-2 inline-block h-2 w-2 rounded-full ${isRefreshing ? "bg-yellow-400 animate-pulse" : "bg-green-400"}`} />
+            {isRefreshing ? "Updating live" : "Live updates on"}
+            {lastSyncedAt ? ` • ${lastSyncedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : ""}
+          </div>
         </div>
 
         {/* Top 3 - Responsive Grid */}
@@ -74,8 +58,8 @@ function Leaderboard() {
           )}
 
           {topThree[0] && (
-            <div className="relative order-0 lg:order-1 sm:col-span-2 lg:col-span-1 rounded-lg border border-yellow-400 bg-gradient-to-b from-yellow-900/40 to-yellow-900/10 p-3 sm:p-4 text-center transition hover:from-yellow-900/60 hover:to-yellow-900/30">
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2 text-3xl sm:text-4xl animate-bounce">👑</div>
+            <div className="relative order-0 lg:order-1 sm:col-span-2 lg:col-span-1 rounded-lg border border-yellow-400 bg-gradient-to-b from-yellow-900/40 to-yellow-900/10 p-3 pt-7 sm:p-4 sm:pt-8 text-center transition hover:from-yellow-900/60 hover:to-yellow-900/30">
+              <div className="absolute left-1/2 top-0 flex w-full -translate-x-1/2 -translate-y-1/2 justify-center text-4xl sm:text-5xl animate-bounce">👑</div>
               <p className="mb-2 text-4xl sm:text-5xl">🥇</p>
               <p className="font-bold text-yellow-300 line-clamp-1 text-sm sm:text-base">{topThree[0].name}</p>
               <p className="text-xs text-yellow-400/60">1st Place</p>
@@ -127,14 +111,6 @@ function Leaderboard() {
               );
             })
           )}
-        </div>
-        
-        {/* Real-time sync indicator */}
-        <div className="mt-4 pt-4 border-t border-white/10 text-center">
-          <p className="text-xs text-white/50 flex items-center justify-center gap-2">
-            <span className={`inline-block w-2 h-2 rounded-full ${isSyncing ? "bg-yellow-400 animate-pulse" : "bg-green-400"}`}></span>
-            {isSyncing ? "Syncing..." : "Live • Auto-updating"}
-          </p>
         </div>
       </Card>
     </div>
