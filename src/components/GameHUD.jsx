@@ -242,7 +242,7 @@ function GameHUD({ time, points, gameState, difficulty, showTimer = true, scoreF
         </div>
       )}
 
-      <div className="fixed top-[72px] right-3 sm:right-5 z-50 flex flex-col items-end gap-2 pointer-events-none">
+      <div className="fixed top-auto bottom-[20px] right-3 sm:right-5 sm:top-[72px] sm:bottom-auto z-50 flex flex-col items-end gap-2 pointer-events-none">
         <div className="relative pointer-events-auto">
           <button
             onClick={() => setShowSettingsPanel((prev) => !prev)}
