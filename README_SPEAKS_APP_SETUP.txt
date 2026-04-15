@@ -1,9 +1,10 @@
 DATABASE NAME: speaks_app
 
-1. Open phpMyAdmin or MySQL.
-2. Run backend/speaks_app_database.sql
-3. Check backend/db.js:
-   database: "speaks_app"
+1. Create a MongoDB Atlas cluster.
+2. Create a database user and whitelist your IP (or 0.0.0.0/0 for testing only).
+3. Set backend environment variables:
+   MONGODB_URI=your_atlas_connection_string
+   MONGODB_DB_NAME=speaks_app
 4. Start backend:
    cd backend
    node server.js
@@ -22,4 +23,4 @@ What is saved per account now:
 
 Premium behavior:
 - ads are hidden while premium is active
-- when premium_expiry is reached, premium is auto-removed on next account fetch/login
+- when premiumExpiry is reached, premium is auto-removed on next account fetch/login

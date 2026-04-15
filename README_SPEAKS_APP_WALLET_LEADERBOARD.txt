@@ -1,7 +1,6 @@
 SPEAKS APP UPDATE
 
-Run this SQL in MySQL first:
-backend/speaks_app_wallet_leaderboard_update.sql
+Database: MongoDB Atlas (no SQL migration file needed)
 
 What changed:
 - wallet_transactions is now aggregated per account + purchase/use type
@@ -11,7 +10,8 @@ What changed:
 - Player 2 leaderboard now shows Coming Soon
 - removed Player 3 option
 
-After SQL:
+After setup:
 1. cd backend
-2. node server.js
-3. in project root run npm run dev
+2. set MONGODB_URI and MONGODB_DB_NAME in backend/.env or Vercel project settings
+3. node server.js
+4. in project root run npm run dev

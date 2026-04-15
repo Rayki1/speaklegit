@@ -9,15 +9,10 @@ Included in this package:
 - Player 2 leaderboard says Coming Soon
 - Player 3 leaderboard removed
 
-Database name:
-- speaks_app
-
-Run this SQL first if your database already exists:
-- backend/speaks_app_wallet_leaderboard_update.sql
-
-If you are setting up fresh, run:
-- backend/speaks_app_database.sql
+Database:
+- MongoDB Atlas database (example name: speaks_app)
+- No SQL file is required for this version.
 
 Then start:
-- backend: node server.js
+- backend: set MONGODB_URI and MONGODB_DB_NAME, then run node server.js
 - frontend: npm run dev

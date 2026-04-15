@@ -4,48 +4,66 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const nodemailer = require("nodemailer");
 const crypto = require("crypto");
-const db = require("./db");
-const { initializeDatabase } = db;
+const { mongoose, initializeDatabase } = require("./db");
 require("dotenv").config();
 
 const app = express();
+const { Schema } = mongoose;
 
-const allowedOrigins = new Set([
-  (process.env.FRONTEND_URL || '').trim(),
-  'http://localhost:5173',
-  'http://127.0.0.1:5173',
-].filter(Boolean));
+const allowedOrigins = new Set(
+  [
+    (process.env.FRONTEND_URL || "").trim(),
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+  ].filter(Boolean)
+);
 
-app.use(cors({
-  origin(origin, callback) {
-    if (!origin) return callback(null, true);
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (!origin) return callback(null, true);
 
-    try {
-      const hostname = new URL(origin).hostname;
-      if (allowedOrigins.has(origin) || hostname === 'localhost' || hostname === '127.0.0.1' || hostname.endsWith('.vercel.app')) {
-        return callback(null, true);
+      try {
+        const hostname = new URL(origin).hostname;
+        if (
+          allowedOrigins.has(origin) ||
+          hostname === "localhost" ||
+          hostname === "127.0.0.1" ||
+          hostname.endsWith(".vercel.app")
+        ) {
+          return callback(null, true);
+        }
+      } catch (error) {
+        console.error("CORS ORIGIN PARSE ERROR:", error);
       }
-    } catch (error) {
-      console.error('CORS ORIGIN PARSE ERROR:', error);
-    }
 
-    return callback(new Error(`Origin not allowed by CORS: ${origin}`));
-  },
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-}));
+      return callback(new Error(`Origin not allowed by CORS: ${origin}`));
+    },
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
 app.use(express.json());
 
 const PORT = process.env.PORT || 5000;
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 let databaseInitPromise = null;
+let modelBootstrapPromise = null;
+
+async function ensureModelsInitialized() {
+  return;
+}
 
 function ensureDatabaseInitialized() {
   if (!databaseInitPromise) {
-    databaseInitPromise = initializeDatabase().catch((error) => {
-      databaseInitPromise = null;
-      throw error;
-    });
+    databaseInitPromise = initializeDatabase()
+      .then(async () => {
+        await ensureModelsInitialized();
+      })
+      .catch((error) => {
+        databaseInitPromise = null;
+        throw error;
+      });
   }
 
   return databaseInitPromise;
@@ -67,6 +85,152 @@ const PREMIUM_TIER_MAP = {
   "Monthly Premium": "monthly",
 };
 
+const CounterSchema = new Schema(
+  {
+    key: { type: String, required: true, unique: true },
+    seq: { type: Number, default: 0 },
+  },
+  { versionKey: false }
+);
+
+const UserSchema = new Schema(
+  {
+    userId: { type: Number, required: true, unique: true, index: true },
+    gmail: { type: String, required: true, unique: true, lowercase: true, trim: true },
+    username: { type: String, required: true, unique: true, trim: true },
+    password: { type: String, required: true },
+    coins: { type: Number, default: 0 },
+    score: { type: Number, default: 0 },
+    profilePicture: { type: String, default: "" },
+    fullName: { type: String, default: "" },
+    premium: { type: Boolean, default: false },
+    premiumTier: { type: String, default: null },
+    premiumExpiry: { type: Date, default: null },
+    hints: {
+      neonMagnet: { type: Number, default: 0 },
+      shadowLetter: { type: Number, default: 0 },
+      underscoreReveal: { type: Number, default: 0 },
+      firstLetterBloom: { type: Number, default: 0 },
+    },
+  },
+  { timestamps: { createdAt: "createdAt", updatedAt: "updatedAt" } }
+);
+
+const LeaderboardSchema = new Schema(
+  {
+    userId: { type: Number, required: true, index: true },
+    username: { type: String, required: true },
+    score: { type: Number, default: 0 },
+    gamesPlayed: { type: Number, default: 0 },
+    wins: { type: Number, default: 0 },
+    mode: { type: String, default: "player1", index: true },
+  },
+  { timestamps: { createdAt: "createdAt", updatedAt: "updatedAt" } }
+);
+LeaderboardSchema.index({ userId: 1, mode: 1 }, { unique: true });
+
+const WalletTransactionSchema = new Schema(
+  {
+    userId: { type: Number, required: true, index: true },
+    transactionType: { type: String, required: true },
+    aggregateKey: { type: String, required: true },
+    amount: { type: Number, default: 0 },
+    coinsChange: { type: Number, default: 0 },
+    transactionCount: { type: Number, default: 1 },
+    details: { type: Schema.Types.Mixed, default: {} },
+    lastTransactionAt: { type: Date, default: Date.now },
+  },
+  { timestamps: { createdAt: "createdAt", updatedAt: "updatedAt" } }
+);
+WalletTransactionSchema.index({ userId: 1, aggregateKey: 1 }, { unique: true });
+
+const CoinPurchaseSchema = new Schema(
+  {
+    userId: { type: Number, required: true, index: true },
+    coinsBought: { type: Number, required: true },
+    amount: { type: Number, required: true },
+  },
+  { timestamps: { createdAt: "createdAt", updatedAt: false } }
+);
+
+const PremiumPurchaseSchema = new Schema(
+  {
+    userId: { type: Number, required: true, index: true },
+    premiumTier: { type: String, required: true },
+    costCoins: { type: Number, required: true },
+    durationDays: { type: Number, required: true },
+    bonusCoins: { type: Number, default: 0 },
+    expiresAt: { type: Date, required: true },
+  },
+  { timestamps: { createdAt: "createdAt", updatedAt: false } }
+);
+
+const PasswordResetSchema = new Schema(
+  {
+    userId: { type: Number, required: true, index: true },
+    resetToken: { type: String, required: true, unique: true },
+    expiresAt: { type: Date, required: true, index: true },
+  },
+  { timestamps: { createdAt: "createdAt", updatedAt: false } }
+);
+
+const ContactMessageSchema = new Schema(
+  {
+    name: { type: String, required: true },
+    email: { type: String, required: true, lowercase: true, trim: true },
+    phone: { type: String, default: "" },
+    preferredMethod: { type: String, enum: ["email", "phone"], default: "email" },
+    message: { type: String, required: true },
+  },
+  { timestamps: { createdAt: "createdAt", updatedAt: false } }
+);
+
+const Counter = mongoose.models.Counter || mongoose.model("Counter", CounterSchema);
+const User = mongoose.models.User || mongoose.model("User", UserSchema);
+const Leaderboard =
+  mongoose.models.Leaderboard || mongoose.model("Leaderboard", LeaderboardSchema);
+const WalletTransaction =
+  mongoose.models.WalletTransaction ||
+  mongoose.model("WalletTransaction", WalletTransactionSchema);
+const CoinPurchase =
+  mongoose.models.CoinPurchase || mongoose.model("CoinPurchase", CoinPurchaseSchema);
+const PremiumPurchase =
+  mongoose.models.PremiumPurchase ||
+  mongoose.model("PremiumPurchase", PremiumPurchaseSchema);
+const PasswordReset =
+  mongoose.models.PasswordReset || mongoose.model("PasswordReset", PasswordResetSchema);
+const ContactMessage =
+  mongoose.models.ContactMessage || mongoose.model("ContactMessage", ContactMessageSchema);
+
+ensureModelsInitialized = async function ensureModelsInitializedImpl() {
+  if (!modelBootstrapPromise) {
+    modelBootstrapPromise = (async () => {
+      // Ensure collections and indexes exist before first request logic runs.
+      await Promise.all([
+        Counter.init(),
+        User.init(),
+        Leaderboard.init(),
+        WalletTransaction.init(),
+        CoinPurchase.init(),
+        PremiumPurchase.init(),
+        PasswordReset.init(),
+        ContactMessage.init(),
+      ]);
+
+      await Counter.updateOne(
+        { key: "users" },
+        { $setOnInsert: { seq: 0 } },
+        { upsert: true }
+      );
+    })().catch((error) => {
+      modelBootstrapPromise = null;
+      throw error;
+    });
+  }
+
+  return modelBootstrapPromise;
+};
+
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
@@ -76,7 +240,7 @@ const transporter = nodemailer.createTransport({
 });
 
 function verifyToken(req, res, next) {
-  const authHeader = req.headers["authorization"];
+  const authHeader = req.headers.authorization;
   const token = authHeader && authHeader.split(" ")[1];
 
   if (!token) {
@@ -94,114 +258,100 @@ function verifyToken(req, res, next) {
   });
 }
 
-function dbQuery(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.query(sql, params, (err, results) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-      resolve(results);
-    });
-  });
-}
-
 function buildDefaultHints(hints = {}) {
   return {
-    neonMagnet: 0,
-    shadowLetter: 0,
-    underscoreReveal: 0,
-    firstLetterBloom: 0,
-    ...hints,
+    neonMagnet: Number(hints.neonMagnet || 0),
+    shadowLetter: Number(hints.shadowLetter || 0),
+    underscoreReveal: Number(hints.underscoreReveal || 0),
+    firstLetterBloom: Number(hints.firstLetterBloom || 0),
   };
 }
 
-async function getHintInventory(userId) {
-  const rows = await dbQuery(
-    "SELECT hint_key, quantity FROM user_hints WHERE user_id = ?",
-    [userId]
-  );
-
-  const hints = buildDefaultHints();
-  rows.forEach((row) => {
-    if (row.hint_key in hints) {
-      hints[row.hint_key] = row.quantity;
-    }
-  });
-
-  return hints;
+function isDuplicateKeyError(error) {
+  return error && (error.code === 11000 || error.code === 11001);
 }
 
-async function ensurePremiumState(userId) {
-  const rows = await dbQuery(
-    "SELECT premium, premium_expiry FROM users WHERE id = ? LIMIT 1",
-    [userId]
+async function getNextSequence(key) {
+  const counter = await Counter.findOneAndUpdate(
+    { key },
+    { $inc: { seq: 1 } },
+    { new: true, upsert: true, setDefaultsOnInsert: true }
   );
 
-  if (!rows.length) return;
+  return counter.seq;
+}
 
-  const row = rows[0];
-  if (row.premium && row.premium_expiry && new Date(row.premium_expiry).getTime() <= Date.now()) {
-    await dbQuery(
-      "UPDATE users SET premium = 0, premium_tier = NULL, premium_expiry = NULL WHERE id = ?",
-      [userId]
-    );
+async function ensurePremiumState(userDoc) {
+  if (!userDoc) return;
+
+  if (userDoc.premium && userDoc.premiumExpiry && userDoc.premiumExpiry.getTime() <= Date.now()) {
+    userDoc.premium = false;
+    userDoc.premiumTier = null;
+    userDoc.premiumExpiry = null;
+    await userDoc.save();
   }
 }
 
 async function getUserById(userId) {
-  await ensurePremiumState(userId);
-  const rows = await dbQuery(
-    `SELECT id, gmail, username, coins, score, profile_picture, full_name,
-            premium, premium_tier, premium_expiry, created_at
-     FROM users WHERE id = ? LIMIT 1`,
-    [userId]
-  );
+  const numericUserId = Number(userId);
+  if (!Number.isFinite(numericUserId)) return null;
 
-  if (!rows.length) return null;
+  const userDoc = await User.findOne({ userId: numericUserId });
+  if (!userDoc) return null;
 
-  const user = rows[0];
-  user.hints = await getHintInventory(userId);
-  return user;
+  await ensurePremiumState(userDoc);
+
+  return {
+    id: userDoc.userId,
+    gmail: userDoc.gmail,
+    username: userDoc.username,
+    coins: Number(userDoc.coins || 0),
+    score: Number(userDoc.score || 0),
+    profilePicture: userDoc.profilePicture || "",
+    fullName: userDoc.fullName || "",
+    premium: Boolean(userDoc.premium),
+    premiumTier: userDoc.premiumTier || null,
+    premiumExpiry: userDoc.premiumExpiry || null,
+    hints: buildDefaultHints(userDoc.hints || {}),
+    createdAt: userDoc.createdAt,
+  };
 }
 
 async function getUserByGmail(gmail) {
-  const rows = await dbQuery(
-    `SELECT id, gmail, username, coins, score, profile_picture, full_name,
-            premium, premium_tier, premium_expiry, created_at
-     FROM users WHERE gmail = ? LIMIT 1`,
-    [gmail]
-  );
+  const cleanGmail = String(gmail || "").trim().toLowerCase();
+  if (!cleanGmail) return null;
 
-  if (!rows.length) return null;
-  await ensurePremiumState(rows[0].id);
-  return getUserById(rows[0].id);
+  const userDoc = await User.findOne({ gmail: cleanGmail });
+  if (!userDoc) return null;
+
+  return getUserById(userDoc.userId);
 }
 
 function buildUserPayload(user, extras = {}) {
   const merged = {
     ...user,
-    profile_picture: extras.profilePicture || user.profile_picture || user.profilePicture || "",
-    full_name: extras.fullName || user.full_name || user.fullName || "",
+    profilePicture: extras.profilePicture || user.profilePicture || "",
+    fullName: extras.fullName || user.fullName || "",
   };
 
   return {
-    id: merged.id,
+    id: Number(merged.id),
     gmail: merged.gmail,
     username: merged.username,
     coins: Number(merged.coins || 0),
     score: Number(merged.score || 0),
-    profilePicture: merged.profile_picture || "",
-    fullName: merged.full_name || "",
+    profilePicture: merged.profilePicture || "",
+    fullName: merged.fullName || "",
     premium: Boolean(merged.premium),
-    premiumTier: merged.premium_tier || null,
-    premiumExpiry: merged.premium_expiry || null,
+    premiumTier: merged.premiumTier || null,
+    premiumExpiry: merged.premiumExpiry || null,
     hints: buildDefaultHints(merged.hints || {}),
   };
 }
 
 function buildAuthResponse(user, extras = {}) {
   const cleanUser = buildUserPayload(user, extras);
+
   const token = jwt.sign(
     {
       id: cleanUser.id,
@@ -262,89 +412,97 @@ function buildWalletAggregateKey(type, details = {}) {
   }
 }
 
-async function recordWalletTransaction({ userId, type, amount = 0, coinsChange = 0, details = null }) {
+async function recordWalletTransaction({
+  userId,
+  type,
+  amount = 0,
+  coinsChange = 0,
+  details = null,
+}) {
   const parsedDetails = details || {};
   const aggregateKey = buildWalletAggregateKey(type, parsedDetails);
 
-  await dbQuery(
-    `INSERT INTO wallet_transactions (
-        user_id, transaction_type, aggregate_key, amount, coins_change, transaction_count, details, last_transaction_at
-     ) VALUES (?, ?, ?, ?, ?, 1, ?, NOW())
-     ON DUPLICATE KEY UPDATE
-        amount = amount + VALUES(amount),
-        coins_change = coins_change + VALUES(coins_change),
-        transaction_count = transaction_count + 1,
-        details = VALUES(details),
-        last_transaction_at = NOW()`,
-    [userId, type, aggregateKey, amount, coinsChange, JSON.stringify(parsedDetails)]
+  await WalletTransaction.findOneAndUpdate(
+    { userId: Number(userId), aggregateKey },
+    {
+      $set: {
+        transactionType: type,
+        details: parsedDetails,
+        lastTransactionAt: new Date(),
+      },
+      $inc: {
+        amount: Number(amount || 0),
+        coinsChange: Number(coinsChange || 0),
+        transactionCount: 1,
+      },
+      $setOnInsert: {
+        userId: Number(userId),
+      },
+    },
+    { upsert: true, new: true, setDefaultsOnInsert: true }
   );
 }
 
+async function upsertLeaderboardEntry(userId, scoreOverride = null, mode = "player1") {
+  const user = await User.findOne({ userId: Number(userId) });
 
-async function upsertLeaderboardEntry(userId, scoreOverride = null, mode = 'player1') {
-  const rows = await dbQuery(
-    `SELECT id, username, score
-     FROM users
-     WHERE id = ?
-     LIMIT 1`,
-    [userId]
-  );
-
-  if (!rows.length) {
+  if (!user) {
     throw new Error("User not found for leaderboard sync");
   }
 
-  const user = rows[0];
-  const leaderboardScore = scoreOverride === null ? Number(user.score || 0) : Math.max(0, Number(scoreOverride || 0));
+  const leaderboardScore =
+    scoreOverride === null
+      ? Number(user.score || 0)
+      : Math.max(0, Number(scoreOverride || 0));
 
-  await dbQuery(
-    `INSERT INTO leaderboard (user_id, username, score, mode)
-     VALUES (?, ?, ?, ?)
-     ON DUPLICATE KEY UPDATE
-        username = VALUES(username),
-        score = VALUES(score),
-        updated_at = CURRENT_TIMESTAMP`,
-    [userId, user.username, leaderboardScore, mode]
+  await Leaderboard.findOneAndUpdate(
+    { userId: user.userId, mode },
+    {
+      $set: {
+        username: user.username,
+        score: leaderboardScore,
+      },
+      $setOnInsert: {
+        gamesPlayed: 0,
+        wins: 0,
+      },
+    },
+    { upsert: true, new: true, setDefaultsOnInsert: true }
   );
 }
 
-async function incrementLeaderboardGamesPlayed(userId, mode = 'player1') {
-  await dbQuery(
-    `INSERT INTO leaderboard (user_id, username, score, games_played, mode)
-     SELECT id, username, score, 1, ?
-     FROM users
-     WHERE id = ?
-     ON DUPLICATE KEY UPDATE
-        username = VALUES(username),
-        score = GREATEST(score, VALUES(score)),
-        games_played = games_played + 1,
-        updated_at = CURRENT_TIMESTAMP`,
-    [mode, userId]
+async function incrementLeaderboardGamesPlayed(userId, mode = "player1") {
+  const user = await User.findOne({ userId: Number(userId) });
+  if (!user) return;
+
+  await Leaderboard.findOneAndUpdate(
+    { userId: user.userId, mode },
+    {
+      $set: {
+        username: user.username,
+      },
+      $max: {
+        score: Number(user.score || 0),
+      },
+      $inc: {
+        gamesPlayed: 1,
+      },
+      $setOnInsert: {
+        wins: 0,
+      },
+    },
+    { upsert: true, new: true, setDefaultsOnInsert: true }
   );
 }
 
 async function initializeNewUserData(userId) {
   const initializationErrors = [];
 
-  for (const hintKey of HINT_KEYS) {
-    try {
-      await dbQuery(
-        `INSERT INTO user_hints (user_id, hint_key, quantity)
-         VALUES (?, ?, 0)
-         ON DUPLICATE KEY UPDATE quantity = quantity`,
-        [userId, hintKey]
-      );
-    } catch (error) {
-      console.error(`USER_HINTS INIT ERROR (${hintKey}):`, error);
-      initializationErrors.push(`hint:${hintKey}`);
-    }
-  }
-
   try {
     await upsertLeaderboardEntry(userId);
   } catch (error) {
-    console.error('LEADERBOARD INIT ERROR:', error);
-    initializationErrors.push('leaderboard');
+    console.error("LEADERBOARD INIT ERROR:", error);
+    initializationErrors.push("leaderboard");
   }
 
   return initializationErrors;
@@ -353,24 +511,11 @@ async function initializeNewUserData(userId) {
 async function buildRegisterResponse(userId, extras = {}) {
   const insertedUser = await getUserById(userId);
 
-  if (insertedUser) {
-    return buildAuthResponse(insertedUser, extras);
+  if (!insertedUser) {
+    throw new Error("User account was created but could not be loaded");
   }
 
-  const fallbackRows = await dbQuery(
-    `SELECT id, gmail, username, coins, score, profile_picture, full_name, premium, premium_tier, premium_expiry
-     FROM users WHERE id = ? LIMIT 1`,
-    [userId]
-  );
-
-  if (!fallbackRows.length) {
-    throw new Error('User account was created but could not be loaded');
-  }
-
-  return buildAuthResponse({
-    ...fallbackRows[0],
-    hints: buildDefaultHints(),
-  }, extras);
+  return buildAuthResponse(insertedUser, extras);
 }
 
 app.get("/", (req, res) => {
@@ -379,8 +524,10 @@ app.get("/", (req, res) => {
 
 app.get("/healthz", async (req, res) => {
   try {
-    await dbQuery("SELECT 1 AS ok");
-    res.json({ ok: true, message: "Backend and database are reachable" });
+    await ensureDatabaseInitialized();
+    await mongoose.connection.db.command({ ping: 1 });
+
+    res.json({ ok: true, message: "Backend and MongoDB are reachable" });
   } catch (error) {
     console.error("HEALTH CHECK ERROR:", error);
     res.status(500).json({ ok: false, message: error.message || "Database is not reachable" });
@@ -411,9 +558,14 @@ app.post("/google-login", async (req, res) => {
     const existingUser = await getUserByGmail(gmail);
 
     if (existingUser) {
-      await dbQuery(
-        "UPDATE users SET profile_picture = ?, full_name = ? WHERE id = ?",
-        [googleUser.picture || "", googleUser.name || "", existingUser.id]
+      await User.updateOne(
+        { userId: existingUser.id },
+        {
+          $set: {
+            profilePicture: googleUser.picture || "",
+            fullName: googleUser.name || "",
+          },
+        }
       );
     }
 
@@ -471,21 +623,27 @@ app.post("/google-complete-profile", async (req, res) => {
     const decoded = jwt.verify(signupToken, process.env.JWT_SECRET);
     const gmail = decoded.gmail;
 
-    const usernameCheck = await dbQuery(
-      "SELECT id FROM users WHERE username = ? AND gmail <> ? LIMIT 1",
-      [cleanUsername, gmail]
-    );
+    const usernameCheck = await User.findOne({
+      username: cleanUsername,
+      gmail: { $ne: gmail },
+    }).select("userId");
 
-    if (usernameCheck.length > 0) {
+    if (usernameCheck) {
       return res.status(400).json({ message: "Username already exists" });
     }
 
     const existingUser = await getUserByGmail(gmail);
 
     if (existingUser) {
-      await dbQuery(
-        "UPDATE users SET username = ?, profile_picture = ?, full_name = ? WHERE id = ?",
-        [cleanUsername, decoded.profilePicture || "", decoded.fullName || "", existingUser.id]
+      await User.updateOne(
+        { userId: existingUser.id },
+        {
+          $set: {
+            username: cleanUsername,
+            profilePicture: decoded.profilePicture || "",
+            fullName: decoded.fullName || "",
+          },
+        }
       );
 
       const updatedUser = await getUserById(existingUser.id);
@@ -500,15 +658,21 @@ app.post("/google-complete-profile", async (req, res) => {
     const randomPassword = crypto.randomBytes(32).toString("hex");
     const hashedPassword = await bcrypt.hash(randomPassword, 10);
 
-    const insertResult = await dbQuery(
-      `INSERT INTO users (gmail, username, password, profile_picture, full_name)
-       VALUES (?, ?, ?, ?, ?)`,
-      [gmail, cleanUsername, hashedPassword, decoded.profilePicture || "", decoded.fullName || ""]
-    );
+    const nextUserId = await getNextSequence("users");
 
-    const initializationErrors = await initializeNewUserData(insertResult.insertId);
+    await User.create({
+      userId: nextUserId,
+      gmail,
+      username: cleanUsername,
+      password: hashedPassword,
+      profilePicture: decoded.profilePicture || "",
+      fullName: decoded.fullName || "",
+      hints: buildDefaultHints(),
+    });
 
-    const authResponse = await buildRegisterResponse(insertResult.insertId, {
+    const initializationErrors = await initializeNewUserData(nextUserId);
+
+    const authResponse = await buildRegisterResponse(nextUserId, {
       profilePicture: decoded.profilePicture || "",
       fullName: decoded.fullName || "",
     });
@@ -523,13 +687,18 @@ app.post("/google-complete-profile", async (req, res) => {
     console.error("GOOGLE COMPLETE PROFILE ERROR:", error);
 
     if (error.name === "JsonWebTokenError" || error.name === "TokenExpiredError") {
-      return res.status(401).json({ message: "Google session expired. Please continue with Google again." });
+      return res
+        .status(401)
+        .json({ message: "Google session expired. Please continue with Google again." });
+    }
+
+    if (isDuplicateKeyError(error)) {
+      return res.status(400).json({ message: "Username or Gmail already exists" });
     }
 
     return res.status(500).json({ message: error.message || "Failed to save profile" });
   }
 });
-
 
 app.post("/register", async (req, res) => {
   try {
@@ -549,35 +718,32 @@ app.post("/register", async (req, res) => {
       return res.status(400).json({ message: "Password must be at least 6 characters" });
     }
 
-    const existingUsername = await dbQuery(
-      "SELECT id FROM users WHERE username = ? LIMIT 1",
-      [username]
-    );
-
-    if (existingUsername.length > 0) {
+    const existingUsername = await User.exists({ username });
+    if (existingUsername) {
       return res.status(400).json({ message: "Username already exists" });
     }
 
-    const existingGmail = await dbQuery(
-      "SELECT id FROM users WHERE gmail = ? LIMIT 1",
-      [gmail]
-    );
-
-    if (existingGmail.length > 0) {
+    const existingGmail = await User.exists({ gmail });
+    if (existingGmail) {
       return res.status(400).json({ message: "Gmail already exists" });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
+    const nextUserId = await getNextSequence("users");
 
-    const insertResult = await dbQuery(
-      `INSERT INTO users (gmail, username, password, profile_picture, full_name)
-       VALUES (?, ?, ?, '', '')`,
-      [gmail, username, hashedPassword]
-    );
+    await User.create({
+      userId: nextUserId,
+      gmail,
+      username,
+      password: hashedPassword,
+      profilePicture: "",
+      fullName: "",
+      hints: buildDefaultHints(),
+    });
 
-    const initializationErrors = await initializeNewUserData(insertResult.insertId);
+    const initializationErrors = await initializeNewUserData(nextUserId);
 
-    const authResponse = await buildRegisterResponse(insertResult.insertId);
+    const authResponse = await buildRegisterResponse(nextUserId);
     return res.status(201).json({
       ...authResponse,
       warning: initializationErrors.length
@@ -586,6 +752,11 @@ app.post("/register", async (req, res) => {
     });
   } catch (error) {
     console.error("REGISTER ERROR:", error);
+
+    if (isDuplicateKeyError(error)) {
+      return res.status(400).json({ message: "Username or Gmail already exists" });
+    }
+
     return res.status(500).json({ message: error.message || "Registration failed" });
   }
 });
@@ -599,26 +770,19 @@ app.post("/login", async (req, res) => {
       return res.status(400).json({ message: "Username and password are required" });
     }
 
-    const rows = await dbQuery(
-      `SELECT id, gmail, username, password, coins, score, profile_picture, full_name, premium, premium_tier, premium_expiry, created_at
-       FROM users
-       WHERE username = ?
-       LIMIT 1`,
-      [username]
-    );
+    const userDoc = await User.findOne({ username });
 
-    if (!rows.length) {
+    if (!userDoc) {
       return res.status(401).json({ message: "Invalid username or password" });
     }
 
-    const user = rows[0];
-    const isPasswordValid = await bcrypt.compare(password, user.password);
+    const isPasswordValid = await bcrypt.compare(password, userDoc.password);
 
     if (!isPasswordValid) {
       return res.status(401).json({ message: "Invalid username or password" });
     }
 
-    const fullUser = await getUserById(user.id);
+    const fullUser = await getUserById(userDoc.userId);
     return res.json(buildAuthResponse(fullUser));
   } catch (error) {
     console.error("LOGIN ERROR:", error);
@@ -626,131 +790,113 @@ app.post("/login", async (req, res) => {
   }
 });
 
-app.post("/forgot-password", (req, res) => {
-  const { gmail } = req.body;
+app.post("/forgot-password", async (req, res) => {
+  try {
+    const { gmail } = req.body;
 
-  if (!gmail) {
-    return res.status(400).json({ message: "Gmail is required" });
-  }
-
-  const sql = "SELECT * FROM users WHERE gmail = ?";
-  db.query(sql, [gmail], (err, results) => {
-    if (err) {
-      console.error("FORGOT PASSWORD DB ERROR:", err);
-      return res.status(500).json({ message: "Database error during forgot password" });
+    if (!gmail) {
+      return res.status(400).json({ message: "Gmail is required" });
     }
 
-    if (results.length === 0) {
+    const cleanGmail = String(gmail).trim().toLowerCase();
+    const userDoc = await User.findOne({ gmail: cleanGmail });
+
+    if (!userDoc) {
       return res.status(404).json({ message: "No account found with that Gmail" });
     }
 
-    const user = results[0];
     const resetToken = crypto.randomBytes(32).toString("hex");
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
-    const insertSql =
-      "INSERT INTO password_resets (user_id, reset_token, expires_at) VALUES (?, ?, ?)";
+    await PasswordReset.create({
+      userId: userDoc.userId,
+      resetToken,
+      expiresAt,
+    });
 
-    db.query(insertSql, [user.id, resetToken, expiresAt], (insertErr) => {
-      if (insertErr) {
-        console.error("RESET TOKEN INSERT ERROR:", insertErr);
-        return res.status(500).json({ message: "Could not create reset token" });
-      }
+    const frontendBase = (process.env.FRONTEND_URL || "http://localhost:5173").replace(/\/$/, "");
+    const resetLink = `${frontendBase}/reset-password/${resetToken}`;
 
-      const resetLink = `http://localhost:5173/reset-password/${resetToken}`;
-
-      transporter.sendMail(
-        {
-          from: process.env.EMAIL_USER,
-          to: gmail,
-          subject: "Reset Your Password",
-          html: `
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: cleanGmail,
+      subject: "Reset Your Password",
+      html: `
             <h2>Password Reset</h2>
             <p>Click the link below to reset your password:</p>
             <a href="${resetLink}">${resetLink}</a>
             <p>This link will expire in 15 minutes.</p>
           `,
-        },
-        (mailErr) => {
-          if (mailErr) {
-            console.error("EMAIL SEND ERROR:", mailErr);
-            return res.status(500).json({ message: "Failed to send email" });
-          }
-
-          res.json({ message: "Password reset email sent" });
-        }
-      );
     });
-  });
+
+    return res.json({ message: "Password reset email sent" });
+  } catch (error) {
+    console.error("FORGOT PASSWORD ERROR:", error);
+    return res.status(500).json({ message: "Database error during forgot password" });
+  }
 });
 
 app.post("/reset-password/:token", async (req, res) => {
-  const { token } = req.params;
-  const { newPassword } = req.body;
+  try {
+    const { token } = req.params;
+    const { newPassword } = req.body;
 
-  if (!newPassword) {
-    return res.status(400).json({ message: "New password is required" });
-  }
-
-  const sql =
-    "SELECT * FROM password_resets WHERE reset_token = ? AND expires_at > NOW()";
-
-  db.query(sql, [token], async (err, results) => {
-    if (err) {
-      console.error("RESET PASSWORD DB ERROR:", err);
-      return res.status(500).json({ message: "Server error" });
+    if (!newPassword) {
+      return res.status(400).json({ message: "New password is required" });
     }
 
-    if (results.length === 0) {
+    const resetDoc = await PasswordReset.findOne({
+      resetToken: token,
+      expiresAt: { $gt: new Date() },
+    });
+
+    if (!resetDoc) {
       return res.status(400).json({ message: "Invalid or expired token" });
     }
 
-    const resetRow = results[0];
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    const hashedPassword = await bcrypt.hash(String(newPassword), 10);
 
-    db.query(
-      "UPDATE users SET password = ? WHERE id = ?",
-      [hashedPassword, resetRow.user_id],
-      (updateErr) => {
-        if (updateErr) {
-          console.error("UPDATE PASSWORD ERROR:", updateErr);
-          return res.status(500).json({ message: "Failed to update password" });
-        }
+    await User.updateOne({ userId: resetDoc.userId }, { $set: { password: hashedPassword } });
+    await PasswordReset.deleteMany({ userId: resetDoc.userId });
 
-        db.query(
-          "DELETE FROM password_resets WHERE user_id = ?",
-          [resetRow.user_id],
-          () => {}
-        );
-
-        res.json({ message: "Password reset successful" });
-      }
-    );
-  });
+    return res.json({ message: "Password reset successful" });
+  } catch (error) {
+    console.error("RESET PASSWORD ERROR:", error);
+    return res.status(500).json({ message: "Server error" });
+  }
 });
 
 app.post("/buy-coins", verifyToken, async (req, res) => {
   try {
     const { coins_bought, amount } = req.body;
-    const userId = req.user.id;
+    const userId = Number(req.user.id);
 
-    if (!coins_bought || !amount) {
+    const safeCoinsBought = Number(coins_bought);
+    const safeAmount = Number(amount);
+
+    if (
+      !Number.isFinite(safeCoinsBought) ||
+      safeCoinsBought <= 0 ||
+      !Number.isFinite(safeAmount) ||
+      safeAmount <= 0
+    ) {
       return res.status(400).json({ message: "Coins and amount are required" });
     }
 
-    await dbQuery("UPDATE users SET coins = coins + ? WHERE id = ?", [coins_bought, userId]);
+    await User.updateOne({ userId }, { $inc: { coins: safeCoinsBought } });
 
-    await dbQuery(
-      "INSERT INTO coin_purchases (user_id, coins_bought, amount) VALUES (?, ?, ?)",
-      [userId, coins_bought, amount]
-    );
+    await CoinPurchase.create({
+      userId,
+      coinsBought: safeCoinsBought,
+      amount: safeAmount,
+    });
 
     await recordWalletTransaction({
       userId,
       type: "buy_coins",
-      amount,
-      coinsChange: Number(coins_bought),
-      details: { coinsBought: coins_bought },
+      amount: safeAmount,
+      coinsChange: safeCoinsBought,
+      details: { coinsBought: safeCoinsBought },
     });
 
     const user = await getUserById(userId);
@@ -764,21 +910,24 @@ app.post("/buy-coins", verifyToken, async (req, res) => {
 app.post("/spend-coins", verifyToken, async (req, res) => {
   try {
     const { amount, reason = "spend", details = null } = req.body;
-    const userId = req.user.id;
+    const userId = Number(req.user.id);
     const spendAmount = Number(amount);
 
     if (!Number.isFinite(spendAmount) || spendAmount <= 0) {
       return res.status(400).json({ message: "Valid amount is required" });
     }
 
-    const result = await dbQuery(
-      "UPDATE users SET coins = coins - ? WHERE id = ? AND coins >= ?",
-      [spendAmount, userId, spendAmount]
-    );
+    const userDoc = await User.findOne({ userId });
+    if (!userDoc) {
+      return res.status(404).json({ message: "User not found" });
+    }
 
-    if (!result.affectedRows) {
+    if (Number(userDoc.coins || 0) < spendAmount) {
       return res.status(400).json({ message: "Not enough coins" });
     }
+
+    userDoc.coins = Number(userDoc.coins || 0) - spendAmount;
+    await userDoc.save();
 
     await recordWalletTransaction({
       userId,
@@ -798,7 +947,7 @@ app.post("/spend-coins", verifyToken, async (req, res) => {
 app.post("/purchase-hint", verifyToken, async (req, res) => {
   try {
     const { hintKey, cost, quantity = 1 } = req.body;
-    const userId = req.user.id;
+    const userId = Number(req.user.id);
     const safeQuantity = Number(quantity);
     const safeCost = Number(cost);
 
@@ -806,27 +955,30 @@ app.post("/purchase-hint", verifyToken, async (req, res) => {
       return res.status(400).json({ message: "Invalid hint key" });
     }
 
-    if (!Number.isFinite(safeQuantity) || safeQuantity <= 0 || !Number.isFinite(safeCost) || safeCost <= 0) {
+    if (
+      !Number.isFinite(safeQuantity) ||
+      safeQuantity <= 0 ||
+      !Number.isFinite(safeCost) ||
+      safeCost <= 0
+    ) {
       return res.status(400).json({ message: "Invalid cost or quantity" });
     }
 
     const totalCost = safeCost * safeQuantity;
 
-    const deductResult = await dbQuery(
-      "UPDATE users SET coins = coins - ? WHERE id = ? AND coins >= ?",
-      [totalCost, userId, totalCost]
-    );
+    const userDoc = await User.findOne({ userId });
+    if (!userDoc) {
+      return res.status(404).json({ message: "User not found" });
+    }
 
-    if (!deductResult.affectedRows) {
+    if (Number(userDoc.coins || 0) < totalCost) {
       return res.status(400).json({ message: "Not enough coins" });
     }
 
-    await dbQuery(
-      `INSERT INTO user_hints (user_id, hint_key, quantity)
-       VALUES (?, ?, ?)
-       ON DUPLICATE KEY UPDATE quantity = quantity + VALUES(quantity)`,
-      [userId, hintKey, safeQuantity]
-    );
+    userDoc.coins = Number(userDoc.coins || 0) - totalCost;
+    userDoc.hints = buildDefaultHints(userDoc.hints || {});
+    userDoc.hints[hintKey] = Number(userDoc.hints[hintKey] || 0) + safeQuantity;
+    await userDoc.save();
 
     await recordWalletTransaction({
       userId,
@@ -846,20 +998,26 @@ app.post("/purchase-hint", verifyToken, async (req, res) => {
 app.post("/consume-hint", verifyToken, async (req, res) => {
   try {
     const { hintKey } = req.body;
-    const userId = req.user.id;
+    const userId = Number(req.user.id);
 
     if (!HINT_KEYS.includes(hintKey)) {
       return res.status(400).json({ message: "Invalid hint key" });
     }
 
-    const result = await dbQuery(
-      "UPDATE user_hints SET quantity = quantity - 1 WHERE user_id = ? AND hint_key = ? AND quantity > 0",
-      [userId, hintKey]
-    );
+    const userDoc = await User.findOne({ userId });
+    if (!userDoc) {
+      return res.status(404).json({ message: "User not found" });
+    }
 
-    if (!result.affectedRows) {
+    userDoc.hints = buildDefaultHints(userDoc.hints || {});
+    const currentQty = Number(userDoc.hints[hintKey] || 0);
+
+    if (currentQty <= 0) {
       return res.status(400).json({ message: "No hint inventory left" });
     }
+
+    userDoc.hints[hintKey] = currentQty - 1;
+    await userDoc.save();
 
     const user = await getUserById(userId);
     return res.json({ message: "Hint consumed", user: buildUserPayload(user) });
@@ -872,44 +1030,49 @@ app.post("/consume-hint", verifyToken, async (req, res) => {
 app.post("/purchase-premium", verifyToken, async (req, res) => {
   try {
     const { name, cost, days, bonusCoins = 0 } = req.body;
-    const userId = req.user.id;
+    const userId = Number(req.user.id);
     const safeCost = Number(cost);
     const safeDays = Number(days);
     const safeBonusCoins = Number(bonusCoins || 0);
 
-    if (!name || !Number.isFinite(safeCost) || safeCost < 0 || !Number.isFinite(safeDays) || safeDays <= 0) {
+    if (
+      !name ||
+      !Number.isFinite(safeCost) ||
+      safeCost < 0 ||
+      !Number.isFinite(safeDays) ||
+      safeDays <= 0
+    ) {
       return res.status(400).json({ message: "Invalid premium package" });
     }
 
     const tierCode = PREMIUM_TIER_MAP[name] || name.toLowerCase().replace(/\s+/g, "_");
 
-    const deductResult = await dbQuery(
-      "UPDATE users SET coins = coins - ? WHERE id = ? AND coins >= ?",
-      [safeCost, userId, safeCost]
-    );
+    const userDoc = await User.findOne({ userId });
+    if (!userDoc) {
+      return res.status(404).json({ message: "User not found" });
+    }
 
-    if (!deductResult.affectedRows) {
+    if (Number(userDoc.coins || 0) < safeCost) {
       return res.status(400).json({ message: "Not enough coins for subscription" });
     }
 
     const expiry = new Date();
     expiry.setDate(expiry.getDate() + safeDays);
 
-    await dbQuery(
-      `UPDATE users
-       SET premium = 1,
-           premium_tier = ?,
-           premium_expiry = ?,
-           coins = coins + ?
-       WHERE id = ?`,
-      [tierCode, expiry, safeBonusCoins, userId]
-    );
+    userDoc.coins = Number(userDoc.coins || 0) - safeCost + safeBonusCoins;
+    userDoc.premium = true;
+    userDoc.premiumTier = tierCode;
+    userDoc.premiumExpiry = expiry;
+    await userDoc.save();
 
-    await dbQuery(
-      `INSERT INTO premium_purchases (user_id, premium_tier, cost_coins, duration_days, bonus_coins, expires_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [userId, tierCode, safeCost, safeDays, safeBonusCoins, expiry]
-    );
+    await PremiumPurchase.create({
+      userId,
+      premiumTier: tierCode,
+      costCoins: safeCost,
+      durationDays: safeDays,
+      bonusCoins: safeBonusCoins,
+      expiresAt: expiry,
+    });
 
     await recordWalletTransaction({
       userId,
@@ -926,7 +1089,6 @@ app.post("/purchase-premium", verifyToken, async (req, res) => {
   }
 });
 
-
 app.post("/contact", async (req, res) => {
   try {
     const { name, email, phone = "", preferredMethod = "email", message } = req.body;
@@ -934,18 +1096,22 @@ app.post("/contact", async (req, res) => {
     const cleanName = String(name || "").trim();
     const cleanEmail = String(email || "").trim().toLowerCase();
     const cleanPhone = String(phone || "").trim();
-    const cleanPreferredMethod = ["email", "phone"].includes(preferredMethod) ? preferredMethod : "email";
+    const cleanPreferredMethod = ["email", "phone"].includes(preferredMethod)
+      ? preferredMethod
+      : "email";
     const cleanMessage = String(message || "").trim();
 
     if (!cleanName || !cleanEmail || !cleanMessage) {
       return res.status(400).json({ message: "Name, email, and message are required" });
     }
 
-    await dbQuery(
-      `INSERT INTO contact_messages (name, email, phone, preferred_method, message)
-       VALUES (?, ?, ?, ?, ?)`,
-      [cleanName, cleanEmail, cleanPhone, cleanPreferredMethod, cleanMessage]
-    );
+    await ContactMessage.create({
+      name: cleanName,
+      email: cleanEmail,
+      phone: cleanPhone,
+      preferredMethod: cleanPreferredMethod,
+      message: cleanMessage,
+    });
 
     const receiverEmail = process.env.CONTACT_RECEIVER_EMAIL || "Speaksoncloud@gmail.com";
 
@@ -971,7 +1137,9 @@ ${cleanMessage}`,
           <p><strong>Phone:</strong> ${cleanPhone || "N/A"}</p>
           <p><strong>Preferred method:</strong> ${cleanPreferredMethod}</p>
           <p><strong>Message:</strong></p>
-          <div style="white-space: pre-wrap; padding: 12px; border: 1px solid #e5e7eb; border-radius: 8px; background: #f9fafb;">${cleanMessage.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>
+          <div style="white-space: pre-wrap; padding: 12px; border: 1px solid #e5e7eb; border-radius: 8px; background: #f9fafb;">${cleanMessage
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")}</div>
         </div>
       `,
     });
@@ -986,7 +1154,7 @@ ${cleanMessage}`,
 app.post("/update-score", verifyToken, async (req, res) => {
   try {
     const { score, mode = "player1", gameCompleted = false, won = false } = req.body;
-    const userId = req.user.id;
+    const userId = Number(req.user.id);
 
     if (score === undefined || !Number.isFinite(Number(score))) {
       return res.status(400).json({ message: "Valid score is required" });
@@ -994,22 +1162,20 @@ app.post("/update-score", verifyToken, async (req, res) => {
 
     const safeScore = Math.max(0, Number(score));
 
-    await dbQuery(
-      "UPDATE users SET score = GREATEST(score, ?) WHERE id = ?",
-      [safeScore, userId]
-    );
+    const userDoc = await User.findOne({ userId });
+    if (!userDoc) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    userDoc.score = Math.max(Number(userDoc.score || 0), safeScore);
+    await userDoc.save();
 
     if (gameCompleted) {
       await upsertLeaderboardEntry(userId, safeScore, mode);
       await incrementLeaderboardGamesPlayed(userId, mode);
 
       if (won) {
-        await dbQuery(
-          `UPDATE leaderboard
-           SET wins = wins + 1
-           WHERE user_id = ? AND mode = ?`,
-          [userId, mode]
-        );
+        await Leaderboard.updateOne({ userId, mode }, { $inc: { wins: 1 } });
       }
     }
 
@@ -1021,39 +1187,52 @@ app.post("/update-score", verifyToken, async (req, res) => {
   }
 });
 
-app.get("/leaderboards", (req, res) => {
-  const sql = `
-    SELECT l.user_id, l.username, l.score, l.games_played, l.wins, l.mode,
-           u.gmail, u.coins, u.premium_tier, u.profile_picture
-    FROM leaderboard l
-    INNER JOIN users u ON u.id = l.user_id
-    WHERE l.mode = 'player1'
-    ORDER BY l.score DESC, u.coins DESC, l.username ASC
-    LIMIT 100
-  `;
+app.get("/leaderboards", async (req, res) => {
+  try {
+    const leaderboardRows = await Leaderboard.find({ mode: "player1" })
+      .sort({ score: -1, username: 1 })
+      .limit(100)
+      .lean();
 
-  db.query(sql, (err, results) => {
-    if (err) {
-      console.error("LEADERBOARD ERROR:", err);
-      return res.status(500).json({ message: "Failed to fetch leaderboard" });
-    }
+    const userIds = leaderboardRows.map((row) => row.userId);
+    const users = await User.find({ userId: { $in: userIds } })
+      .select("userId gmail coins premiumTier profilePicture")
+      .lean();
 
-    res.json({
+    const userMap = new Map(users.map((user) => [user.userId, user]));
+
+    const combined = leaderboardRows
+      .map((row) => {
+        const user = userMap.get(row.userId) || {};
+        return {
+          userId: row.userId,
+          username: row.username,
+          gmail: user.gmail || "",
+          score: Number(row.score || 0),
+          coins: Number(user.coins || 0),
+          gamesPlayed: Number(row.gamesPlayed || 0),
+          wins: Number(row.wins || 0),
+          premiumTier: user.premiumTier || null,
+          profilePicture: user.profilePicture || "",
+        };
+      })
+      .sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        if (b.coins !== a.coins) return b.coins - a.coins;
+        return String(a.username).localeCompare(String(b.username));
+      });
+
+    return res.json({
       mode: "player1",
-      entries: results.map((row, index) => ({
+      entries: combined.map((row, index) => ({
         rank: index + 1,
-        userId: row.user_id,
-        username: row.username,
-        gmail: row.gmail,
-        score: Number(row.score || 0),
-        coins: Number(row.coins || 0),
-        gamesPlayed: Number(row.games_played || 0),
-        wins: Number(row.wins || 0),
-        premiumTier: row.premium_tier || null,
-        profilePicture: row.profile_picture || "",
+        ...row,
       })),
     });
-  });
+  } catch (error) {
+    console.error("LEADERBOARD ERROR:", error);
+    return res.status(500).json({ message: "Failed to fetch leaderboard" });
+  }
 });
 
 app.get("/profile", verifyToken, async (req, res) => {
@@ -1064,7 +1243,7 @@ app.get("/profile", verifyToken, async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    res.json(buildUserPayload(user));
+    return res.json(buildUserPayload(user));
   } catch (error) {
     console.error("PROFILE ERROR:", error);
     return res.status(500).json({ message: "Failed to fetch profile" });
@@ -1079,7 +1258,7 @@ if (require.main === module) {
         console.log(`Server running on port ${PORT}`);
       });
     } catch (error) {
-      console.error('DATABASE INITIALIZATION ERROR:', error);
+      console.error("DATABASE INITIALIZATION ERROR:", error);
       process.exit(1);
     }
   })();
