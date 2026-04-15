@@ -515,9 +515,6 @@ async function incrementLeaderboardGamesPlayed(userId, mode = "player1") {
       $set: {
         username: user.username,
       },
-      $max: {
-        score: Number(user.score || 0),
-      },
       $inc: {
         gamesPlayed: 1,
       },
@@ -1222,11 +1219,13 @@ app.post("/update-score", verifyToken, async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    userDoc.score = Math.max(Number(userDoc.score || 0), safeScore);
-    await userDoc.save();
+    if (gameCompleted) {
+      userDoc.score = Number(userDoc.score || 0) + safeScore;
+      await userDoc.save();
+    }
 
     if (gameCompleted) {
-      await upsertLeaderboardEntry(userId, safeScore, mode);
+      await upsertLeaderboardEntry(userId, Number(userDoc.score || 0), mode);
       await incrementLeaderboardGamesPlayed(userId, mode);
 
       if (won) {

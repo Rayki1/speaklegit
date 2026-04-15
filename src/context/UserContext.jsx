@@ -194,7 +194,7 @@ export function UserProvider({ children }) {
 
     setAndPersistUser((prev) => ({
       ...prev,
-      score: Math.max(prev.score || 0, safeRoundScore),
+      score: Number(prev.score || 0) + safeRoundScore,
     }));
 
     if (!user.loggedIn || user.isGuest) {
@@ -395,9 +395,7 @@ export function UserProvider({ children }) {
 
       if (exists !== -1) {
         const updated = [...prev];
-        if (score > updated[exists].score) {
-          updated[exists].score = score;
-        }
+        updated[exists].score = Number(updated[exists].score || 0) + Number(score || 0);
         return updated.sort((a, b) => b.score - a.score);
       }
 
