@@ -59,9 +59,6 @@ function Leaderboard() {
 
           {topThree[0] && (
             <div className="relative order-0 lg:order-1 sm:col-span-2 lg:col-span-1 rounded-lg border border-yellow-400 bg-gradient-to-b from-yellow-900/40 to-yellow-900/10 p-3 pt-7 sm:p-4 sm:pt-8 text-center transition hover:from-yellow-900/60 hover:to-yellow-900/30">
-              <div className="pointer-events-none absolute left-1/2 top-0 z-10 -translate-x-[82%] -translate-y-1/2 text-4xl sm:text-5xl animate-bounce">
-                👑
-              </div>
               <p className="mb-2 text-4xl sm:text-5xl">🥇</p>
               <p className="font-bold text-yellow-300 line-clamp-1 text-sm sm:text-base">{topThree[0].name}</p>
               <p className="text-xs text-yellow-400/60">1st Place</p>
