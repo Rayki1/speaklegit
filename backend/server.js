@@ -96,6 +96,28 @@ function ensureDatabaseInitialized() {
   return databaseInitPromise;
 }
 
+async function requireDatabaseReady(res) {
+  if (!HAS_MONGO_URI) {
+    res.status(503).json({
+      message: "Database is unavailable",
+      detail: "MONGODB_URI is missing in environment variables",
+    });
+    return false;
+  }
+
+  try {
+    await ensureDatabaseInitialized();
+    return true;
+  } catch (error) {
+    console.error("DATABASE READY CHECK FAILED:", error);
+    res.status(503).json({
+      message: "Database is not ready yet",
+      detail: error?.message || "MongoDB connection failed",
+    });
+    return false;
+  }
+}
+
 if (!process.env.JWT_SECRET) {
   console.warn("JWT_SECRET is missing. Auth routes will fail until it is set.");
 }
@@ -600,6 +622,10 @@ app.post("/google-login", async (req, res) => {
       });
     }
 
+    if (!(await requireDatabaseReady(res))) {
+      return;
+    }
+
     const { credential } = req.body;
     const googleUser = await verifyGoogleCredential(credential);
     const gmail = googleUser.email.trim().toLowerCase();
@@ -659,6 +685,10 @@ app.post("/google-complete-profile", async (req, res) => {
         message: "Authentication is unavailable",
         detail: "JWT_SECRET is missing in environment variables",
       });
+    }
+
+    if (!(await requireDatabaseReady(res))) {
+      return;
     }
 
     const { signupToken, username } = req.body;
@@ -765,6 +795,10 @@ app.post("/register", async (req, res) => {
       });
     }
 
+    if (!(await requireDatabaseReady(res))) {
+      return;
+    }
+
     const username = (req.body.username || "").trim();
     const gmail = (req.body.gmail || "").trim().toLowerCase();
     const password = String(req.body.password || "");
@@ -834,6 +868,10 @@ app.post("/login", async (req, res) => {
         message: "Authentication is unavailable",
         detail: "JWT_SECRET is missing in environment variables",
       });
+    }
+
+    if (!(await requireDatabaseReady(res))) {
+      return;
     }
 
     const username = (req.body.username || "").trim();

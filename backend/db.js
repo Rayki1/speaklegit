@@ -26,9 +26,9 @@ async function initializeDatabase() {
     const connectWithOptions = (extraOptions = {}) =>
       mongoose.connect(uri, {
         dbName: dbName || undefined,
-        serverSelectionTimeoutMS: 10000,
+        serverSelectionTimeoutMS: 30000,
         maxPoolSize: 10,
-        socketTimeoutMS: 15000,
+        socketTimeoutMS: 30000,
         retryWrites: true,
         w: "majority",
         tls: true,
