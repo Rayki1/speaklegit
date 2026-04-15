@@ -80,12 +80,12 @@ function ensureDatabaseInitialized() {
 
   if (!databaseInitPromise) {
     databaseInitPromise = initializeDatabase()
-      .then(async () => {
-        try {
-          await ensureModelsInitialized();
-        } catch (error) {
+      .then((connection) => {
+        // Warm indexes and seed data in the background so auth routes only wait for DB connect.
+        ensureModelsInitialized().catch((error) => {
           console.error("MODEL INITIALIZATION WARNING:", error);
-        }
+        });
+        return connection;
       })
       .catch((error) => {
         databaseInitPromise = null;
